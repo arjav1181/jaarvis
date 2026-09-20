@@ -1,0 +1,34 @@
+{
+  "generated_by": "jarvis/skills-port/port_skills.py",
+  "skills": [
+    {
+      "name": "explain-error",
+      "sha256": "e62c53beefa20f67034ea80094c982551c89a859f0925286c66b2d18b931384c",
+      "source": "skills-src/explain-error/SKILL.md",
+      "tier": "L0",
+      "trigger": "what does this error mean"
+    },
+    {
+      "name": "morning-brief",
+      "sha256": "5142ddf476beb9be2666d76daf4bc5ff2e23c7d9082d301aefa4ec2e58386fb5",
+      "source": "commands-src/brief.md",
+      "tier": "L1",
+      "trigger": "brief me"
+    },
+    {
+      "name": "ship-pr",
+      "sha256": "377b8d1d8b6d02af442657d1ab525c53c689623ca81884e15d70a186ad794711",
+      "source": "skills-src/ship-pr/SKILL.md",
+      "tier": "L2",
+      "trigger": "ship it"
+    },
+    {
+      "name": "test-runner",
+      "sha256": "84d3f231fede987945069a4fb933e42d4d46b1a9bc0200233b42f108a2ee2f94",
+      "source": "skills-src/test-runner/SKILL.md",
+      "tier": "L1",
+      "trigger": "run the failing test"
+    }
+  ],
+  "src_root": "/home/runner/workspace/jarvis"
+}
