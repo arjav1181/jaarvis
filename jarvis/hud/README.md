@@ -64,3 +64,24 @@ it would break single-port forwarding and need its own auth story.
 - Injection: every render is `textContent` (zero `innerHTML`/`document.write`/
   `eval` in the file — asserted in tests); transcript travels as a JSON
   string into `prompt.submit`, never evaluated.
+
+## W4 — beast talk (continuous hands-free + narration + streaming partials)
+
+- **State machine** (visible badge): `IDLE → LISTENING → TRANSCRIBING →
+  THINKING → SPEAKING → LISTENING…` (continuous) or back to `IDLE`.
+- **Hands-free loop**: `🔁 Continuous` toggle; reply done → mic reopens by
+  itself. Client VAD auto-stops on 1.2 s sub-threshold silence
+  (`VAD_LEVEL`/`VAD_SILENCE_MS`; server Silero VAD stays authoritative).
+  Stop-phrases (`stop|goodbye|good night|that's all|cancel|never mind`)
+  end hands-free instead of submitting — voice AND typed.
+- **Narrated work**: milestone speech on `message.start` + tool events +
+  turn end, per-soul lines (`NARR.jarvis` crisp / `NARR.ultron`
+  theatrical), verbosity `verbose|normal|silent` (start+tools+done /
+  start+done / none). Speech-only: narration never submits, never approves,
+  shares the output slot (partials win, barge-in kills it).
+- **Streaming partials**: complete sentences speak as they arrive (ordered
+  queue); turn end speaks only the unspoken remainder, else labels
+  `SPEAK[streamed first-audio:Nms]` (first reply-audio play minus submit —
+  narration excluded from the stamp).
+- **Soul**: read once at login from `/api/config display.personality`
+  (drives narration lines; TTS voice itself stays server-side per soul).
