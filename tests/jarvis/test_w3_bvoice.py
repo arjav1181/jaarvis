@@ -266,8 +266,10 @@ def test_fallback_and_safety_static():
 def test_redaction_pre_journal():
     src = PAGE.read_text()
     posts = re.findall(r"fetch\(\s*[\"']([^\"']+)", src)
+    # W4 adds one same-origin GET: /api/config (reads display.personality for
+    # narration voice; sends no transcript content anywhere).
     allowed = {"/auth/password-login", "/api/auth/ws-ticket", "/api/audio/transcribe",
-               "/api/audio/speak", "/api/sessions", "/api/sessions/"}
+               "/api/audio/speak", "/api/sessions", "/api/sessions/", "/api/config"}
     for url in posts:
         base = url.split("?")[0]
         assert any(base == a or base.startswith(a.rstrip("/") + "/") or a in base

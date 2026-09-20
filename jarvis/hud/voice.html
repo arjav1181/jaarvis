@@ -49,6 +49,7 @@
 
 <div id="app" class="hidden">
   <div class="sub" id="threadinfo">no thread yet</div>
+  <div class="sub" id="statebadge">state: IDLE</div>
   <div id="thread" aria-live="polite"></div>
   <div id="vu" aria-hidden="true"><div id="vubar"></div></div>
   <div class="controls">
@@ -56,6 +57,8 @@
     <button id="tog" disabled>🎙 Start</button>
     <button id="kill" class="danger" disabled>■ Stop</button>
     <button id="speakbtn">🔊 Speak: on</button>
+    <button id="contbtn">🔁 Continuous: off</button>
+    <button id="verbbtn">💬 Verbose: normal</button>
   </div>
   <div id="composer">
     <input id="textbox" placeholder="Type here — works with no mic" aria-label="text message">
@@ -86,9 +89,33 @@ function el(tag, cls, text) {
   return n;
 }
 // ---- state ----
+// Visible conversation state machine:
+// IDLE -> LISTENING -> TRANSCRIBING -> THINKING -> SPEAKING -> LISTENING...
+// (continuous hands-free) or back to IDLE. Every transition paints #statebadge.
+const STATES = ["IDLE", "LISTENING", "TRANSCRIBING", "THINKING", "SPEAKING"];
+// Client VAD for hands-free auto-stop (server VAD stays authoritative for STT).
+const VAD_LEVEL = 10;      // analyser peak below this (0-255) counts as silence
+const VAD_SILENCE_MS = 1200; // silence this long auto-stops the recording
+// Stop-phrases end continuous hands-free (checked on voice transcripts AND typed text).
+const STOP_PATTERNS = /^(stop|goodbye|good night|that'?s all|that is all|cancel|never mind)\b[.! ]*$/i;
+// Narration verbosity: verbose (start+tools+done) / normal (start+done) / silent.
+const VERBOSITIES = ["verbose", "normal", "silent"];
+// Per-soul milestone lines (speech-only: narration approves nothing).
+const NARR = {
+  jarvis: { start: "Working on it, sir.", tool: "On it, sir.", done: "Done, sir." },
+  ultron: { start: "Ah, the little wheels turn, creator.",
+            tool: "Savor the machinery, creator.", done: "Behold — finished." },
+};
 const S = { sid: null, ws: null, req: 0, rec: null, chunks: [], audio: null,
             recording: false, streaming: false, speak: true, lastDeltaAt: 0,
-            quietTimer: null, bargeMs: null, turns: 0 };
+            quietTimer: null, restTimer: null, bargeMs: null, turns: 0,
+            state: "IDLE", cont: false, verbosity: "normal", soul: "jarvis",
+            spoken: 0, submitAt: 0, firstAudioAt: 0, narrAt: 0, narrGen: 0,
+            pq: [], pqBusy: false, manualStop: false, silenceSince: 0 };
+function setState(s) {
+  S.state = s;
+  $("statebadge").textContent = "state: " + s + (S.cont ? " · hands-free on" : "");
+}
 // ---- thread UI ----
 function addTurn(who, label) {
   const d = el("div", "turn");
@@ -109,9 +136,13 @@ function setInfo() {
 // ---- audio output + barge-in ----
 function stopPlayback(reason) {
   // Barge-in cancel: synchronous pause, measured for the <500ms proof.
+  // Also clears the partial-speech queue and invalidates narration audio.
   const t0 = performance.now();
   try { if (S.audio) { S.audio.pause(); S.audio.currentTime = 0; } } catch (e) {}
   S.audio = null;
+  S.pq = [];
+  S.pqBusy = false;
+  S.narrGen += 1;
   S.bargeMs = performance.now() - t0;
   return reason || "stopped";
 }
@@ -123,20 +154,39 @@ async function interruptTurn() {
   return true;
 }
 // ---- speech ----
+async function fetchSpeech(text) {
+  // Raw synthesis: returns {data_url, provider} or throws. Shared by replies,
+  // narration, and streaming partials. Never fakes audio.
+  const r = await fetch("/api/audio/speak", { method: "POST",
+    credentials: "include", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text }) });
+  if (!r.ok) throw new Error("speak HTTP " + r.status);
+  const j = await r.json();
+  if (!j.ok || !j.data_url) throw new Error((j && j.detail) || "synthesis failed");
+  return j;
+}
+function playUrl(dataUrl, stamp) {
+  // Play one URL on the shared output slot; resolves when done (or superseded).
+  // stamp=false for narration (first-audio measures REPLY audio only).
+  return new Promise((resolve) => {
+    stopPlayback();
+    const a = new Audio(dataUrl);
+    S.audio = a;
+    const back = () => { if (S.streaming) setState("THINKING"); };
+    a.onended = () => { if (S.audio === a) S.audio = null; back(); resolve(true); };
+    a.onerror = () => { if (S.audio === a) S.audio = null; back(); resolve(false); };
+    a.play().then(() => {
+      setState("SPEAKING");
+      if (stamp !== false && !S.firstAudioAt) S.firstAudioAt = performance.now();
+    }).catch(() => resolve(false));
+  });
+}
 async function speak(text, metaEl) {
   // Honest SPEAK labels on EVERY reply. Returns the label string.
   if (!S.speak) { metaEl.textContent += " · SPEAK[off]"; return "SPEAK[off]"; }
   try {
-    const r = await fetch("/api/audio/speak", { method: "POST",
-      credentials: "include", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text }) });
-    if (!r.ok) throw new Error("speak HTTP " + r.status);
-    const j = await r.json();
-    if (!j.ok || !j.data_url) throw new Error((j && j.detail) || "synthesis failed");
-    stopPlayback();
-    const a = new Audio(j.data_url);
-    S.audio = a;
-    await a.play();
+    const j = await fetchSpeech(text);
+    await playUrl(j.data_url);
     const label = "SPEAK[server:" + (j.provider || "edge") + "]";
     metaEl.textContent += " · " + label;
     return label;
@@ -186,6 +236,59 @@ function rpc(method, params) {
     setTimeout(() => { S.ws.removeEventListener("message", h); rej(new Error("RPC timeout")); }, 30000);
   });
 }
+// ---- narrated work (speech-only: narration approves nothing, submits nothing) ----
+function narrLines() {
+  return NARR[S.soul] || NARR.jarvis;
+}
+async function narrate(kind) {
+  // Milestone speech while tools run. Throttled, skipped when silent mode,
+  // speak off, or real reply audio is playing (partials win). Killed by the
+  // same stopPlayback path as everything else (generation token).
+  if (S.verbosity === "silent" || !S.speak || !S.streaming) return;
+  if (kind === "tool" && S.verbosity !== "verbose") return;
+  const now = performance.now();
+  if (now - S.narrAt < 8000) return;
+  S.narrAt = now;
+  if (S.audio && !S.audio.paused) return;
+  const gen = S.narrGen;
+  try {
+    const j = await fetchSpeech(narrLines()[kind] || narrLines().start);
+    if (gen !== S.narrGen) return; // superseded (barge-in/kill)
+    if (S.audio && !S.audio.paused) return; // reply audio won the race
+    note("narrating…");
+    await playUrl(j.data_url, false);
+  } catch (e) { /* narration is best-effort; the reply still speaks */ }
+}
+// ---- streaming partials (speak sentences as they arrive) ----
+function splitSentences(text) {
+  // Complete sentences (terminator + whitespace) vs trailing fragment.
+  const parts = text.split(/(?<=[.!?])\s+/);
+  if (parts.length > 1) return { done: parts.slice(0, -1), rest: parts[parts.length - 1] };
+  return { done: [], rest: text };
+}
+function partialPump() {
+  // Speak newly completed sentences in order. First play stamps firstAudioAt.
+  if (!cur || !S.speak || S.pqBusy) return;
+  const fresh = cur.text.slice(S.spoken);
+  const { done, rest } = splitSentences(fresh);
+  if (!done.length) return;
+  S.pq.push(...done);
+  S.spoken += fresh.length - rest.length; // exact consumed span
+  drainPartials();
+}
+async function drainPartials() {
+  if (S.pqBusy || !S.pq.length) return;
+  S.pqBusy = true;
+  while (S.pq.length) {
+    const sentence = S.pq.shift();
+    try {
+      const j = await fetchSpeech(sentence);
+      await playUrl(j.data_url);
+    } catch (e) { break; }
+    if (!cur) break; // turn finished/killed mid-drain
+  }
+  S.pqBusy = false;
+}
 let cur = null; // active assistant bubble {t, m, text}
 function onWsMsg(ev) {
   let f;
@@ -198,6 +301,13 @@ function onWsMsg(ev) {
     cur.t.textContent = cur.text;
     S.lastDeltaAt = performance.now();
     armQuiet();
+    partialPump();
+  } else if (type === "message.start" && cur) {
+    setState("THINKING");
+    if (S.verbosity !== "silent") narrate("start");
+  } else if ((type === "tool.generating" || type === "reasoning.delta") && cur) {
+    if (type === "tool.generating") narrate("tool");
+    armQuiet(); // tool work resets the quiet clock too
   } else if (type === "turn.end" || type === "turn.error") {
     finishTurn(type === "turn.error" ? ("error: " + (p.message || p.reason || "turn failed")) : "");
   }
@@ -252,11 +362,53 @@ async function finishTurn(err) {
   if (err) done.m.textContent += " · " + err;
   S.turns += 1;
   setInfo();
-  await speak(done.text, done.m);
+  // Drain any queued partials, then (normal/verbose) a done-narration,
+  // then speak only the unspoken remainder. If streaming spoke everything,
+  // label it streamed (with first-audio ms).
+  let guard = 0;
+  while (S.pqBusy && guard++ < 600) await new Promise((r) => setTimeout(r, 100));
+  if (S.verbosity !== "silent" && S.speak && !err && done.text.trim()) {
+    try {
+      const j = await fetchSpeech(narrLines().done);
+      done.m.textContent += " · SPEAK[narrate]";
+      await playUrl(j.data_url, false);
+    } catch (e) { /* narration best-effort */ }
+  }
+  const rest = (done.text || "").slice(S.spoken).trim();
+  if (S.speak && rest) {
+    await speak(rest, done.m);
+  } else if (S.speak && !rest && done.text.trim()) {
+    const ms = S.firstAudioAt ? Math.round(S.firstAudioAt - S.submitAt) : -1;
+    done.m.textContent += " · SPEAK[streamed first-audio:" + ms + "ms]";
+  } else {
+    await speak(done.text, done.m);
+  }
+  if (S.verbosity !== "silent" && S.speak && !err) note(" ");
+  autoRestart();
+}
+function autoRestart() {
+  // Hands-free loop: reply done -> mic reopens by itself.
+  if (!S.cont || S.manualStop) { setState("IDLE"); return; }
+  if (!micSupported()) { setState("IDLE"); return; }
+  setState("LISTENING");
+  startRec().then(() => { S.manualStop = false; }).catch((e) => {
+    S.cont = false;
+    $("contbtn").textContent = "🔁 Continuous: off";
+    setState("IDLE");
+    note("mic blocked: " + String((e && e.message) || e).slice(0, 80));
+  });
 }
 async function submit(text) {
   if (!text.trim()) return;
   if (S.streaming) return;
+  // Stop-phrases end hands-free instead of submitting (voice AND typed).
+  if (S.cont && STOP_PATTERNS.test(text.trim())) {
+    S.cont = false;
+    $("contbtn").textContent = "🔁 Continuous: off";
+    setState("IDLE");
+    note("hands-free off — say hi whenever, sir.");
+    return;
+  }
   // Barge-in: new input during playback cancels it first.
   if (S.audio) {
     const why = stopPlayback("barge");
@@ -276,7 +428,11 @@ async function submit(text) {
   $("thread").appendChild(d);
   $("thread").scrollTop = $("thread").scrollHeight;
   S.streaming = true;
+  S.spoken = 0;
+  S.firstAudioAt = 0;
+  S.submitAt = performance.now();
   setBusy(true);
+  setState("THINKING");
   try {
     await rpc("prompt.submit", { session_id: S.sid, text });
   } catch (e) {
@@ -299,12 +455,25 @@ function vuFrom(stream) {
     src.connect(an);
     const buf = new Uint8Array(an.frequencyBinCount);
     const bar = $("vubar");
+    S.silenceSince = 0;
     (function tick() {
       if (!S.recording) { bar.style.width = "0%"; return; }
       an.getByteFrequencyData(buf);
       let mx = 0;
       for (let i = 0; i < buf.length; i++) if (buf[i] > mx) mx = buf[i];
       bar.style.width = Math.round((mx / 255) * 100) + "%";
+      // Client VAD: sustained sub-threshold level auto-stops (hands-free only).
+      const now = performance.now();
+      if (mx < VAD_LEVEL) {
+        if (!S.silenceSince) S.silenceSince = now;
+        else if (S.cont && now - S.silenceSince > VAD_SILENCE_MS) {
+          note("silence — auto-stopping");
+          stopRec();
+          return;
+        }
+      } else {
+        S.silenceSince = 0;
+      }
       requestAnimationFrame(tick);
     })();
   } catch (e) { /* VU is decorative; recording works without it */ }
@@ -321,8 +490,10 @@ async function startRec() {
   S.tracks = stream.getTracks();
   rec.start(250);
   S.recording = true;
+  S.silenceSince = 0;
   vuFrom(stream);
   $("tog").textContent = "⏹ Stop";
+  setState("LISTENING");
   note("recording…");
 }
 function stopRec() {
@@ -330,6 +501,7 @@ function stopRec() {
   S.recording = false;
   if (S.tracks) S.tracks.forEach((t) => { try { t.stop(); } catch (e) {} });
   $("tog").textContent = "🎙 Start";
+  if (!S.streaming) setState("TRANSCRIBING");
 }
 async function onRecStop() {
   S.recording = false;
@@ -378,7 +550,14 @@ $("loginbtn").onclick = async () => {
     $("pass").value = "";
     $("login").classList.add("hidden");
     $("app").classList.remove("hidden");
+    setState("IDLE");
     await connectWs();
+    try {
+      const cfg = await (await fetch("/api/config?include_defaults=false",
+        { credentials: "include" })).json();
+      const p = ((cfg.display || {}).personality || "").toLowerCase();
+      S.soul = (p === "ultron") ? "ultron" : "jarvis";
+    } catch (e) { /* soul defaults to jarvis */ }
     const okMic = micSupported();
     $("ptt").disabled = !okMic;
     $("tog").disabled = !okMic;
@@ -401,7 +580,8 @@ $("ptt").addEventListener("pointerdown", async (e) => {
 $("ptt").addEventListener("pointerup", () => { if (S.recording) stopRec(); });
 $("ptt").addEventListener("pointercancel", () => { if (S.recording) stopRec(); });
 $("tog").onclick = async () => {
-  if (S.recording) { stopRec(); return; }
+  if (S.recording) { S.manualStop = true; stopRec(); return; }
+  S.manualStop = false;
   if (S.streaming && S.audio) { stopPlayback("barge"); await interruptTurn(); }
   try { await startRec(); } catch (err) {
     note("mic blocked: " + String((err && err.message) || err).slice(0, 80));
@@ -424,6 +604,34 @@ $("kill").onclick = async () => {
 $("speakbtn").onclick = () => {
   S.speak = !S.speak;
   $("speakbtn").textContent = S.speak ? "🔊 Speak: on" : "🔇 Speak: off";
+};
+$("contbtn").onclick = async () => {
+  S.cont = !S.cont;
+  S.manualStop = false;
+  $("contbtn").textContent = S.cont ? "🔁 Continuous: on" : "🔁 Continuous: off";
+  if (S.cont && !S.recording && !S.streaming) {
+    if (!micSupported()) {
+      note("No microphone API — continuous needs a mic; text still works.");
+      S.cont = false;
+      $("contbtn").textContent = "🔁 Continuous: off";
+      return;
+    }
+    setState("LISTENING");
+    try { await startRec(); } catch (err) {
+      S.cont = false;
+      $("contbtn").textContent = "🔁 Continuous: off";
+      setState("IDLE");
+      note("mic blocked: " + String((err && err.message) || err).slice(0, 80));
+    }
+  } else if (!S.cont) {
+    setState("IDLE");
+    note("hands-free off.");
+  }
+};
+$("verbbtn").onclick = () => {
+  const i = (VERBOSITIES.indexOf(S.verbosity) + 1) % VERBOSITIES.length;
+  S.verbosity = VERBOSITIES[i];
+  $("verbbtn").textContent = "💬 Verbose: " + S.verbosity;
 };
 </script>
 </body>
