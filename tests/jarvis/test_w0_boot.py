@@ -38,10 +38,11 @@ def test_upstream_pin_matches_checkout():
     assert "NousResearch/hermes-agent" in pin
     m = re.search(r"\b[0-9a-f]{40}\b", pin)
     assert m, "UPSTREAM_PIN.md must record the full 40-char HEAD SHA"
-    # Since the W0 orphan-root push (see UPSTREAM_PIN.md push note), HEAD is
-    # our root commit; the pin must equal the shallow boundary = upstream tip.
-    shallow = (REPO_ROOT / ".git" / "shallow").read_text().split()
-    assert m.group(0) in shallow, "pinned SHA must be the shallow boundary (upstream pin)"
+    # Post-W1-repair the history is unshallowed: the pin must be an ancestor
+    # of the checkout (it was the W0 shallow boundary / upstream tip).
+    r = subprocess.run(["git", "merge-base", "--is-ancestor", m.group(0), "HEAD"],
+                       cwd=REPO_ROOT, capture_output=True)
+    assert r.returncode == 0, "pinned SHA must be an ancestor of the checkout"
 
 
 def test_shim_is_executable_passthrough():
