@@ -1,0 +1,50 @@
+{
+  "board": "jarvis-ops",
+  "description": "Jarvis ops queue: brief, CI watch, reviews. Orchestrator decomposes, workers execute, every delivery lands as a PR with proofs.",
+  "profiles": [
+    {
+      "name": "jarvis-orchestrator",
+      "role": "orchestrator",
+      "description": "Jarvis ops orchestrator: decomposes ops goals into small contracted kanban tasks, routes by worker description, owns review and unblock. Never executes task work directly; never merges without green proofs. Speaks crisply: what changed, what proves it, what remains."
+    },
+    {
+      "name": "jarvis-worker",
+      "role": "worker",
+      "description": "Jarvis ops worker: executes exactly one contracted kanban task at a time inside the fork worktree, runs the scoped tests, delivers as a PR with proofs in the body. Asks on ambiguity; never widens its own authority; L2 always confirms."
+    }
+  ],
+  "tasks": [
+    {
+      "key": "morning-brief-proof",
+      "title": "Prove morning-brief end to end",
+      "body": "Confirm the morning-brief cron job fires, attaches jarvis-morning, and delivers. Paste one delivery receipt. PR contract: PR to jaarvis base jarvis with cron history line for morning-brief, delivery receipt, tests/jarvis green. No direct push to jarvis. Merge only when green.",
+      "assignee": "jarvis-worker",
+      "priority": 1,
+      "skills": [
+        "jarvis-morning"
+      ],
+      "completion_contract": "arjav1181/jaarvis"
+    },
+    {
+      "key": "ci-watchdog-proof",
+      "title": "Prove ci-watchdog change reporting",
+      "body": "Confirm the ci-watchdog monitor fingerprint changes on new runs and the job reports conclusions. Paste one report. PR contract: PR to jaarvis base jarvis with monitor fingerprint before/after, watchdog report text, tests/jarvis green. Never merge red; fixes land as separate PRs.",
+      "assignee": "jarvis-worker",
+      "priority": 1,
+      "skills": [
+        "ci-watchdog"
+      ],
+      "completion_contract": "arjav1181/jaarvis"
+    },
+    {
+      "key": "weekly-review-spec",
+      "title": "Specify the weekly review task",
+      "body": "Triage seed: define the weekly review deliverable (wins/debts/focus sources, schedule, delivery target). PR contract: promote from triage with a completion contract, or a PR adding the weekly-review job spec with schedule and delivery target.",
+      "assignee": "jarvis-orchestrator",
+      "priority": 2,
+      "triage": true,
+      "skills": [],
+      "completion_contract": "arjav1181/jaarvis"
+    }
+  ]
+}
