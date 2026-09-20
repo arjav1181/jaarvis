@@ -1,0 +1,13 @@
+{
+  "name": "ci-watchdog",
+  "schedule": "*/30 * * * *",
+  "prompt": "A CI state change was detected on the fork (see the MONITOR CHANGE DETECTED diff). Apply the ci-watchdog skill: report workflow, run id, branch, conclusion, failing step plus first error line. If the change is green, reply in one line and stop. Never merge, never publish, never force-push.",
+  "skills": ["ci-watchdog"],
+  "model": "auto/best-reasoning",
+  "provider": "custom",
+  "continuity": true,
+  "deliver": "local",
+  "failure_deliver": "local",
+  "workdir": "/home/runner/workspace/hermes-fork",
+  "monitor_script": "ci-fingerprint.sh"
+}

@@ -1,0 +1,13 @@
+{
+  "name": "morning-brief",
+  "schedule": "0 7 * * *",
+  "prompt": "Run the jarvis-morning bundle: recall today's open work from memory, report CI state on the jarvis branch of the fork in one line, suggest one first action. Output three bullets (Recall / CI / Focus). Dedupe against your previous run's output; if nothing changed overnight, say so in one line and stop. Never send, post, or merge anything.",
+  "skills": ["jarvis-morning"],
+  "model": "auto/best-reasoning",
+  "provider": "custom",
+  "continuity": true,
+  "deliver": "bot-chat",
+  "failure_deliver": "local",
+  "workdir": "/home/runner/workspace/hermes-fork",
+  "monitor_script": null
+}
