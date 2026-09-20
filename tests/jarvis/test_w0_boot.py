@@ -68,7 +68,8 @@ def test_persona_config_parses():
     personas = (cfg.get("agent") or {}).get("personalities") or {}
     assert set(("jarvis", "ultron")) <= set(personas), "agent.personalities needs jarvis+ultron"
     assert personas["jarvis"].strip(), "jarvis persona must be non-empty"
-    assert "TODO(W1)" in personas["ultron"], "ultron is a W1 stub in W0"
+    # W1: ultron is a real entry (the W0 TODO stub is superseded; see test_w1_souls).
+    assert "TODO" not in personas["ultron"], "ultron stub must be gone since W1"
 
 
 def test_default_profile_untouched():
