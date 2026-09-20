@@ -1,0 +1,16 @@
+#!/usr/bin/env sh
+# jarvis — overlay CLI alias for the Hermes-agent fork (W0).
+#
+# Rename map implementation: `hermes` CLI entry -> `jarvis` alias.
+# Keeps `hermes` working underneath (pure passthrough via exec).
+# Config-home override uses the supported key only: HERMES_HOME
+# (see hermes_constants.py — context override -> $HERMES_HOME -> default).
+# No repo-wide sed, no core rewrites.
+set -u
+
+# Default to the Jarvis home; an explicit HERMES_HOME always wins
+# (tests and power users point it at isolated homes, e.g. ~/.jarvis-test).
+: "${HERMES_HOME:=$HOME/.jarvis}"
+export HERMES_HOME
+
+exec hermes "$@"
