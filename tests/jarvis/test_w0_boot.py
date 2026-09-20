@@ -38,9 +38,10 @@ def test_upstream_pin_matches_checkout():
     assert "NousResearch/hermes-agent" in pin
     m = re.search(r"\b[0-9a-f]{40}\b", pin)
     assert m, "UPSTREAM_PIN.md must record the full 40-char HEAD SHA"
-    head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=REPO_ROOT,
-                          capture_output=True, text=True, check=True).stdout.strip()
-    assert m.group(0) == head, "pinned SHA must equal the checkout HEAD"
+    # Since the W0 orphan-root push (see UPSTREAM_PIN.md push note), HEAD is
+    # our root commit; the pin must equal the shallow boundary = upstream tip.
+    shallow = (REPO_ROOT / ".git" / "shallow").read_text().split()
+    assert m.group(0) in shallow, "pinned SHA must be the shallow boundary (upstream pin)"
 
 
 def test_shim_is_executable_passthrough():
