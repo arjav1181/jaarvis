@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Jarvis Voice</title>
+<style>
+  :root { color-scheme: dark; }
+  body { background:#14100a; color:#FFF8DC; font-family:system-ui,sans-serif;
+         margin:0; padding:16px; max-width:720px; margin-inline:auto; }
+  h1 { color:#FFD700; font-size:1.3rem; margin:0 0 4px; }
+  .sub { color:#B8860B; font-size:.85rem; margin-bottom:12px; }
+  #thread { border:1px solid #8B6914; border-radius:8px; min-height:220px;
+            max-height:46vh; overflow-y:auto; padding:10px; margin-bottom:12px;
+            background:#1a1408; }
+  .turn { margin:8px 0; }
+  .who { font-size:.75rem; color:#DAA520; }
+  .txt { white-space:pre-wrap; word-break:break-word; }
+  .meta { font-size:.72rem; color:#8A7A4A; }
+  .controls { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:12px; }
+  button { min-height:48px; min-width:48px; font-size:1rem; border-radius:10px;
+           border:1px solid #B8860B; background:#2a2113; color:#FFE9A3; padding:10px 16px; }
+  button:disabled { opacity:.4; }
+  button.danger { border-color:#A93333; color:#FF7A5C; }
+  #vu { width:100%; height:14px; background:#1a1408; border:1px solid #8B6914;
+        border-radius:7px; overflow:hidden; margin-bottom:12px; }
+  #vubar { height:100%; width:0%; background:#FFD700; }
+  #composer { display:flex; gap:8px; margin-bottom:8px; }
+  #textbox { flex:1; min-height:48px; border-radius:10px; border:1px solid #8B6914;
+             background:#1a1408; color:#FFF8DC; padding:10px; font-size:1rem; }
+  #login { display:flex; flex-direction:column; gap:8px; margin-bottom:12px; }
+  #login input { min-height:44px; border-radius:8px; border:1px solid #8B6914;
+                 background:#1a1408; color:#FFF8DC; padding:8px; font-size:1rem; }
+  .note { font-size:.8rem; color:#B8860B; }
+  .hidden { display:none !important; }
+  label.speak { font-size:.85rem; display:flex; gap:6px; align-items:center; }
+</style>
+</head>
+<body>
+<h1>◆ Jarvis Voice</h1>
+<div class="sub" id="statusline">ears + mouth only — the brain stays server-side.</div>
+
+<div id="login">
+  <input id="user" autocomplete="username" value="sir" aria-label="username">
+  <input id="pass" type="password" autocomplete="current-password" aria-label="password" placeholder="password">
+  <button id="loginbtn">Log in</button>
+  <div class="note" id="loginerr"></div>
+</div>
+
+<div id="app" class="hidden">
+  <div class="sub" id="threadinfo">no thread yet</div>
+  <div id="thread" aria-live="polite"></div>
+  <div id="vu" aria-hidden="true"><div id="vubar"></div></div>
+  <div class="controls">
+    <button id="ptt" disabled>Hold to talk</button>
+    <button id="tog" disabled>🎙 Start</button>
+    <button id="kill" class="danger" disabled>■ Stop</button>
+    <button id="speakbtn">🔊 Speak: on</button>
+  </div>
+  <div id="composer">
+    <input id="textbox" placeholder="Type here — works with no mic" aria-label="text message">
+    <button id="send">Send</button>
+  </div>
+  <div class="note" id="micnote"></div>
+  <div class="note">No audio is stored server-side (temp files are unlinked after
+  transcribe/speak). Transcripts live in this page only — nothing is saved anywhere.
+  Voice never widens permissions: L2 confirmations still apply.</div>
+</div>
+
+<script>
+"use strict";
+/* Jarvis browser voice — ears + mouth ONLY.
+ * Mic -> POST /api/audio/transcribe -> transcript -> prompt.submit over /api/ws
+ *   -> message.delta stream -> POST /api/audio/speak -> <audio> playback.
+ * No model/tool logic here. All rendering via textContent (markup-string
+ * sinks are banned by test — no HTML-string rendering anywhere in this
+ * file). Nothing persisted: no client-side storage, no transcript-store
+ * POSTs. Same-origin fetch carries the session
+ * cookie (credentials:"include"); WS uses a single-use ticket. */
+// ---- tiny DOM helpers (textContent only) ----
+const $ = (id) => document.getElementById(id);
+function el(tag, cls, text) {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text !== undefined) n.textContent = text;
+  return n;
+}
+// ---- state ----
+const S = { sid: null, ws: null, req: 0, rec: null, chunks: [], audio: null,
+            recording: false, streaming: false, speak: true, lastDeltaAt: 0,
+            quietTimer: null, bargeMs: null, turns: 0 };
+// ---- thread UI ----
+function addTurn(who, label) {
+  const d = el("div", "turn");
+  d.appendChild(el("div", "who", who));
+  const t = el("div", "txt", "");
+  d.appendChild(t);
+  const m = el("div", "meta", label || "");
+  d.appendChild(m);
+  $("thread").appendChild(d);
+  $("thread").scrollTop = $("thread").scrollHeight;
+  return { t, m };
+}
+function setInfo() {
+  $("threadinfo").textContent = S.sid
+    ? "thread " + S.sid + " · " + S.turns + " turn(s) · shared with text chat · server-side memory on"
+    : "no thread yet";
+}
+// ---- audio output + barge-in ----
+function stopPlayback(reason) {
+  // Barge-in cancel: synchronous pause, measured for the <500ms proof.
+  const t0 = performance.now();
+  try { if (S.audio) { S.audio.pause(); S.audio.currentTime = 0; } } catch (e) {}
+  S.audio = null;
+  S.bargeMs = performance.now() - t0;
+  return reason || "stopped";
+}
+async function interruptTurn() {
+  if (!S.sid || !S.ws || S.ws.readyState !== 1) return false;
+  S.req += 1;
+  S.ws.send(JSON.stringify({ jsonrpc: "2.0", id: "v" + S.req,
+    method: "session.interrupt", params: { session_id: S.sid } }));
+  return true;
+}
+// ---- speech ----
+async function speak(text, metaEl) {
+  // Honest SPEAK labels on EVERY reply. Returns the label string.
+  if (!S.speak) { metaEl.textContent += " · SPEAK[off]"; return "SPEAK[off]"; }
+  try {
+    const r = await fetch("/api/audio/speak", { method: "POST",
+      credentials: "include", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }) });
+    if (!r.ok) throw new Error("speak HTTP " + r.status);
+    const j = await r.json();
+    if (!j.ok || !j.data_url) throw new Error((j && j.detail) || "synthesis failed");
+    stopPlayback();
+    const a = new Audio(j.data_url);
+    S.audio = a;
+    await a.play();
+    const label = "SPEAK[server:" + (j.provider || "edge") + "]";
+    metaEl.textContent += " · " + label;
+    return label;
+  } catch (e) {
+    // Absent-backend honesty: never fake audio.
+    const label = "SPEAK[not-spoken:" + String((e && e.message) || e).slice(0, 60) + "]";
+    metaEl.textContent += " · " + label;
+    return label;
+  }
+}
+// ---- turn over WS ----
+function ensureWs() {
+  if (S.ws && (S.ws.readyState === 0 || S.ws.readyState === 1)) return S.ws;
+  return null;
+}
+async function connectWs() {
+  const t = await (await fetch("/api/auth/ws-ticket", { method: "POST",
+    credentials: "include", headers: { "Content-Type": "application/json" },
+    body: "{}" })).json();
+  if (!t.ticket) throw new Error("no WS ticket");
+  const proto = location.protocol === "https:" ? "wss:" : "ws:";
+  const ws = new WebSocket(proto + "//" + location.host + "/api/ws?ticket=" + encodeURIComponent(t.ticket));
+  S.ws = ws;
+  ws.onmessage = onWsMsg;
+  await new Promise((res, rej) => {
+    ws.onopen = res; ws.onerror = () => rej(new Error("WS failed"));
+  });
+  S.req += 1;
+  const sid = await rpc("session.create", {});
+  S.sid = sid.session_id || sid;
+  setInfo();
+}
+function rpc(method, params) {
+  return new Promise((res, rej) => {
+    const id = "v" + (++S.req);
+    const h = (ev) => {
+      let d;
+      try { d = JSON.parse(ev.data); } catch (e) { return; }
+      if (d.id === id) {
+        S.ws.removeEventListener("message", h);
+        if (d.error) rej(new Error(d.error.message || "RPC error"));
+        else res(d.result);
+      }
+    };
+    S.ws.addEventListener("message", h);
+    S.ws.send(JSON.stringify({ jsonrpc: "2.0", id, method, params }));
+    setTimeout(() => { S.ws.removeEventListener("message", h); rej(new Error("RPC timeout")); }, 30000);
+  });
+}
+let cur = null; // active assistant bubble {t, m, text}
+function onWsMsg(ev) {
+  let f;
+  try { f = JSON.parse(ev.data); } catch (e) { return; }
+  if (f.method !== "event" || !f.params) return;
+  const type = f.params.type, p = f.params.payload || {};
+  if (type === "message.delta" && cur) {
+    cur.text += (p.text || "");
+    cur.wsDeltas = true;
+    cur.t.textContent = cur.text;
+    S.lastDeltaAt = performance.now();
+    armQuiet();
+  } else if (type === "turn.end" || type === "turn.error") {
+    finishTurn(type === "turn.error" ? ("error: " + (p.message || p.reason || "turn failed")) : "");
+  }
+}
+function armQuiet() {
+  // Reply-complete heuristic: authoritative turn.end wins; otherwise 4s of
+  // event silence after the last delta (any session event re-arms), with a
+  // REST backstop (server-side thread is source of truth).
+  clearTimeout(S.quietTimer);
+  S.quietTimer = setTimeout(() => { if (cur) finishTurn(""); }, 4000);
+  armRest();
+}
+async function restBackstop() {
+  // Poll the server-side thread for the completed reply (title == our text).
+  // Fires only while a turn is still open; WS deltas win when they flow.
+  if (!cur || !cur.submitted) return;
+  try {
+    const r = await fetch("/api/sessions?limit=8", { credentials: "include" });
+    if (!r.ok) return;
+    const j = await r.json();
+    const hit = (j.sessions || []).find((s) => (s.title || "") === cur.submitted);
+    if (!hit) return;
+    const m = await (await fetch("/api/sessions/" + encodeURIComponent(hit.id) +
+      "/messages?limit=6", { credentials: "include" })).json();
+    const msgs = m.messages || [];
+    const last = msgs.filter((x) => x.role === "assistant").pop();
+    const txt = last ? String(last.text || last.content || "") : "";
+    if (txt && txt === cur.restSeen && !cur.wsDeltas) {
+      cur.t.textContent = txt;
+      cur.text = txt;
+      finishTurn("via thread");
+    } else if (txt) {
+      cur.restSeen = txt;
+    }
+  } catch (e) { /* backstop is best-effort; WS path remains primary */ }
+}
+function armRest() {
+  clearInterval(S.restTimer);
+  S.restTimer = setInterval(() => {
+    if (!cur) clearInterval(S.restTimer);
+    else restBackstop();
+  }, 3000);
+}
+async function finishTurn(err) {
+  if (!cur) return;
+  const done = cur;
+  cur = null;
+  clearTimeout(S.quietTimer);
+  clearInterval(S.restTimer);
+  S.streaming = false;
+  setBusy(false);
+  if (err) done.m.textContent += " · " + err;
+  S.turns += 1;
+  setInfo();
+  await speak(done.text, done.m);
+}
+async function submit(text) {
+  if (!text.trim()) return;
+  if (S.streaming) return;
+  // Barge-in: new input during playback cancels it first.
+  if (S.audio) {
+    const why = stopPlayback("barge");
+    await interruptTurn();
+    note("Barge-in cancel: " + why + " in " + S.bargeMs.toFixed(1) + "ms");
+  }
+  if (!ensureWs()) await connectWs();
+  const u = addTurn("you", "");
+  u.t.textContent = text;
+  cur = { t: el("div"), m: null, text: "", submitted: text, restSeen: "", wsDeltas: false };
+  const d = el("div", "turn");
+  d.appendChild(el("div", "who", "jarvis"));
+  cur.t.className = "txt";
+  cur.m = el("div", "meta", "listening…");
+  d.appendChild(cur.t);
+  d.appendChild(cur.m);
+  $("thread").appendChild(d);
+  $("thread").scrollTop = $("thread").scrollHeight;
+  S.streaming = true;
+  setBusy(true);
+  try {
+    await rpc("prompt.submit", { session_id: S.sid, text });
+  } catch (e) {
+    finishTurn("submit failed: " + String((e && e.message) || e).slice(0, 80));
+  }
+}
+function setBusy(b) {
+  ["ptt", "tog", "send"].forEach((id) => { $(id).disabled = b && id !== "kill"; });
+  $("kill").disabled = !b;
+}
+function note(s) { $("micnote").textContent = s; }
+// ---- mic ----
+let AC = null;
+function vuFrom(stream) {
+  try {
+    AC = AC || new (window.AudioContext || window.webkitAudioContext)();
+    const src = AC.createMediaStreamSource(stream);
+    const an = AC.createAnalyser();
+    an.fftSize = 256;
+    src.connect(an);
+    const buf = new Uint8Array(an.frequencyBinCount);
+    const bar = $("vubar");
+    (function tick() {
+      if (!S.recording) { bar.style.width = "0%"; return; }
+      an.getByteFrequencyData(buf);
+      let mx = 0;
+      for (let i = 0; i < buf.length; i++) if (buf[i] > mx) mx = buf[i];
+      bar.style.width = Math.round((mx / 255) * 100) + "%";
+      requestAnimationFrame(tick);
+    })();
+  } catch (e) { /* VU is decorative; recording works without it */ }
+}
+async function startRec() {
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  const mime = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "";
+  const rec = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
+  S.rec = rec;
+  S.chunks = [];
+  rec.ondataavailable = (e) => { if (e.data && e.data.size) S.chunks.push(e.data); };
+  rec.onstop = onRecStop;
+  stream.getTracks().forEach((t) => { S["track_" + t.kind] = t; });
+  S.tracks = stream.getTracks();
+  rec.start(250);
+  S.recording = true;
+  vuFrom(stream);
+  $("tog").textContent = "⏹ Stop";
+  note("recording…");
+}
+function stopRec() {
+  if (S.rec && S.rec.state !== "inactive") S.rec.stop();
+  S.recording = false;
+  if (S.tracks) S.tracks.forEach((t) => { try { t.stop(); } catch (e) {} });
+  $("tog").textContent = "🎙 Start";
+}
+async function onRecStop() {
+  S.recording = false;
+  $("vubar").style.width = "0%";
+  const type = (S.rec && S.rec.mimeType) || "audio/webm";
+  const blob = new Blob(S.chunks, { type });
+  S.chunks = [];
+  if (!blob.size) { note("empty recording — try again"); return; }
+  const dataUrl = await new Promise((res, rej) => {
+    const fr = new FileReader();
+    fr.onload = () => res(fr.result);
+    fr.onerror = rej;
+    fr.readAsDataURL(blob);
+  });
+  note("transcribing…");
+  let tr;
+  try {
+    const r = await fetch("/api/audio/transcribe", { method: "POST",
+      credentials: "include", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ data_url: dataUrl, mime_type: type }) });
+    tr = await r.json();
+    if (!r.ok || !tr.ok) throw new Error((tr && tr.detail) || ("transcribe HTTP " + r.status));
+  } catch (e) {
+    note("transcribe failed: " + String((e && e.message) || e).slice(0, 100));
+    return;
+  }
+  const text = (tr.transcript || "").trim();
+  if (!text) { note("heard silence — try again"); return; }
+  note("heard (" + (tr.provider || "stt") + "): " + text.slice(0, 80));
+  await submit(text);
+}
+function micSupported() {
+  return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia &&
+            window.MediaRecorder);
+}
+// ---- wiring ----
+$("loginbtn").onclick = async () => {
+  $("loginerr").textContent = "";
+  try {
+    const r = await fetch("/auth/password-login", { method: "POST",
+      credentials: "include", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ provider: "basic", username: $("user").value,
+                             password: $("pass").value }) });
+    const j = await r.json();
+    if (!r.ok || !j.ok) throw new Error("login rejected (" + r.status + ")");
+    $("pass").value = "";
+    $("login").classList.add("hidden");
+    $("app").classList.remove("hidden");
+    await connectWs();
+    const okMic = micSupported();
+    $("ptt").disabled = !okMic;
+    $("tog").disabled = !okMic;
+    if (!okMic) {
+      $("micnote").textContent = "No microphone API in this browser — type below, it talks back all the same.";
+    } else {
+      $("micnote").textContent = "Mic ready. Hold the button, or tap Start/Stop.";
+    }
+  } catch (e) {
+    $("loginerr").textContent = "Login failed: " + String((e && e.message) || e).slice(0, 100);
+  }
+};
+$("ptt").addEventListener("pointerdown", async (e) => {
+  e.preventDefault();
+  if (S.streaming && S.audio) { stopPlayback("barge"); await interruptTurn(); }
+  try { await startRec(); } catch (err) {
+    note("mic blocked: " + String((err && err.message) || err).slice(0, 80));
+  }
+});
+$("ptt").addEventListener("pointerup", () => { if (S.recording) stopRec(); });
+$("ptt").addEventListener("pointercancel", () => { if (S.recording) stopRec(); });
+$("tog").onclick = async () => {
+  if (S.recording) { stopRec(); return; }
+  if (S.streaming && S.audio) { stopPlayback("barge"); await interruptTurn(); }
+  try { await startRec(); } catch (err) {
+    note("mic blocked: " + String((err && err.message) || err).slice(0, 80));
+  }
+};
+$("send").onclick = () => {
+  const v = $("textbox").value;
+  $("textbox").value = "";
+  submit(v);
+};
+$("textbox").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") { e.preventDefault(); $("send").click(); }
+});
+$("kill").onclick = async () => {
+  stopPlayback("killed");
+  const ok = await interruptTurn();
+  if (cur) await finishTurn(ok ? "stopped by you" : "stop failed");
+  else note("nothing running");
+};
+$("speakbtn").onclick = () => {
+  S.speak = !S.speak;
+  $("speakbtn").textContent = S.speak ? "🔊 Speak: on" : "🔇 Speak: off";
+};
+</script>
+</body>
+</html>

@@ -3,9 +3,11 @@
 #
 # Usage: jarvis-persona jarvis|ultron
 #
-# Sets BOTH halves of the flip (upstream keeps them independent):
+# Sets THREE halves of the flip (upstream keeps them independent):
 #   display.personality -> <name>   (session overlay text, /personality-compatible)
 #   display.skin        -> <name>-gold|<name>-crimson equivalent
+#   tts.edge.voice      -> per-soul voice from jarvis/personas/voices.yml
+#                          (W3: spoken replies honor the active soul)
 # Takes effect on the next utterance (resolve_ephemeral_system_prompt reads
 # display.personality per turn; the skin applies to CLI/TUI surfaces).
 # Respects HERMES_HOME (defaults to ~/.jarvis, like jarvis/bin/jarvis).
@@ -31,6 +33,27 @@ before_skin="$(hermes config get display.skin 2>/dev/null || echo default)"
 
 hermes config set display.personality "$1" >/dev/null || exit "$?"
 hermes config set display.skin "$SKIN" >/dev/null || exit "$?"
+
+# Per-soul TTS voice so spoken replies honor the active soul (W3).
+# Resolve through the install symlink (venv bin -> repo file).
+SELF="$0"
+if command -v readlink >/dev/null 2>&1; then
+  RL="$(readlink -f "$SELF" 2>/dev/null || echo "")"
+  [ -n "$RL" ] && SELF="$RL"
+fi
+SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$SELF")" && pwd)"
+VENV_PY="/home/runner/.venvs/jarvis-w0/bin/python"
+VOICE="$("$VENV_PY" -c "
+import yaml
+v = yaml.safe_load(open('$SCRIPT_DIR/../personas/voices.yml'))['$1']['edge']
+print(v['voice'])
+" 2>/dev/null || echo "")"
+if [ -n "$VOICE" ]; then
+  before_voice="$(hermes config get tts.edge.voice 2>/dev/null || echo default)"
+  hermes config set tts.edge.voice "$VOICE" >/dev/null || exit "$?"
+  after_voice="$(hermes config get tts.edge.voice 2>/dev/null || echo "$VOICE")"
+  echo "voice: ${before_voice} -> ${after_voice}"
+fi
 
 after_personality="$(hermes config get display.personality 2>/dev/null || echo "$1")"
 after_skin="$(hermes config get display.skin 2>/dev/null || echo "$SKIN")"
