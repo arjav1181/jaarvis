@@ -1,15 +1,16 @@
 # Per-soul TTS map — config only (engines land in W2).
 # Applied by the voice loop when it lands; this file only pins the choice.
 # Voice IDs verified, not guessed:
-#   edge       — live `edge-tts --list-voices` (this wave)
+#   edge       — live `edge-tts --list-voices` (W1 for jarvis/ultron,
+#                W12 for friday: en-IE-EmilyNeural)
 #   openai     — OpenAI TTS docs voice list (alloy/ash/ballad/coral/echo/fable/
 #                nova/onyx/sage/shimmer/verse/marin/cedar) + upstream default `alloy`
 #   elevenlabs — upstream code default Adam `pNInz6obpgDQGcFmaJgB` (W2 key required)
-# Schema mirrors the upstream `tts` config section: tts.<provider>.voice[/speed],
-# elevenlabs uses voice_id. `speed` follows the upstream edge convention
-# (1.0 = default; rate derived as ±% — see tools/tts_tool_providers.py).
+# Multilingual voices live in languages.yml (W12). Schema mirrors the upstream
+# `tts` config section: tts.<provider>.voice[/speed], elevenlabs uses
+# voice_id. `speed` follows the upstream edge convention (1.0 = default; rate
+# derived as ±% — see tools/tts_tool_providers.py).
 # User-overridable: copy any block into <home>/config.yaml under `tts:`.
-
 jarvis:
   edge:
     voice: en-GB-RyanNeural
@@ -18,11 +19,17 @@ jarvis:
     voice: alloy
   elevenlabs:
     voice_id: pNInz6obpgDQGcFmaJgB
-
 ultron:
   edge:
     voice: en-US-ChristopherNeural
     speed: 0.95
   openai:
     voice: onyx
+  elevenlabs: null
+friday:
+  edge:
+    voice: en-IE-EmilyNeural
+    speed: 1.0
+  openai:
+    voice: shimmer
   elevenlabs: null

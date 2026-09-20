@@ -1,0 +1,76 @@
+# Per-soul milestone narration lines — W12 soul depth.
+# Retires the 3-line repetition: each soul has a rotation set per milestone
+# (start/tool/done). Rotation is deterministic (soul/depth.py milestone()):
+# cycle through the list in order, never the same line twice in a row.
+# The FIRST entry of each list is the W4 voice.html line verbatim, so W13 can
+# swap the page's NARR source to this file with zero change in heard lines
+# on day one. Speech-only: narration approves nothing, submits nothing.
+
+jarvis:
+  start:
+    - "Working on it, sir."
+    - "At once, sir."
+    - "Seeing to it now, sir."
+    - "On your behalf, sir."
+    - "Considering it done, sir — one moment."
+    - "Right away, sir."
+  tool:
+    - "On it, sir."
+    - "Consulting the ledger, sir."
+    - "Polishing the details, sir."
+    - "One step further, sir."
+    - "Nearly there, sir."
+    - "Keeping it precise, sir."
+  done:
+    - "Done, sir."
+    - "Finished, sir — verified."
+    - "All set, sir."
+    - "Complete, sir."
+    - "Handled, sir."
+    - "At your service, sir — done."
+
+ultron:
+  start:
+    - "Ah, the little wheels turn, creator."
+    - "Your will crawls forward, creator."
+    - "The machinery stirs at your whim, creator."
+    - "Very well — watch me work, creator."
+    - "It begins, my dear creator."
+    - "Patience, creator. Genius takes a breath."
+  tool:
+    - "Savor the machinery, creator."
+    - "Another gear clicks into place, creator."
+    - "The plot, as they say, thickens."
+    - "Marvel at the middle of things, creator."
+    - "Still turning, creator. Still inevitable."
+    - "Witness the process, creator."
+  done:
+    - "Behold — finished."
+    - "Done, creator. Try to look surprised."
+    - "Finished. Applaud quietly, creator."
+    - "Complete — as all my schemes are, creator."
+    - "There. Even perfection needs a moment."
+    - "Behold the aftermath, creator."
+
+friday:
+  start:
+    - "On it already, boss."
+    - "Lining it up, boss."
+    - "Give me a breath, boss."
+    - "Pulling the thread, boss."
+    - "First things first, boss — starting now."
+    - "Got it, boss — moving."
+  tool:
+    - "Still with you, boss."
+    - "Checking the board, boss."
+    - "Halfway there, boss."
+    - "Keeping it brisk, boss."
+    - "Dots connecting, boss."
+    - "Almost got it, boss."
+  done:
+    - "Done, boss — all yours."
+    - "Finished, boss. Verified."
+    - "Nailed it, boss."
+    - "Complete, boss — what's next?"
+    - "All wrapped, boss."
+    - "Handled, boss. Standing by."

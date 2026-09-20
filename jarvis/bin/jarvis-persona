@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 # jarvis-persona — flip the active soul + skin (W1 toggle mechanism).
 #
-# Usage: jarvis-persona jarvis|ultron
+# Usage: jarvis-persona jarvis|ultron|friday
 #
 # Sets THREE halves of the flip (upstream keeps them independent):
 #   display.personality -> <name>   (session overlay text, /personality-compatible)
@@ -17,7 +17,7 @@ set -u
 export HERMES_HOME
 
 usage() {
-  echo "usage: jarvis-persona jarvis|ultron" >&2
+    echo "usage: jarvis-persona jarvis|ultron|friday" >&2
   exit 2
 }
 
@@ -25,6 +25,7 @@ usage() {
 case "$1" in
   jarvis) SKIN="jarvis-gold" ;;
   ultron) SKIN="ultron-crimson" ;;
+  friday) SKIN="friday-emerald" ;;
   *) usage ;;
 esac
 

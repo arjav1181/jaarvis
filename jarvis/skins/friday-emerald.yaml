@@ -1,0 +1,51 @@
+# Friday-emerald — fresh emerald on deep slate, brisk and warm. Inherits the
+# default skin; only overridden keys are listed here (see
+# hermes_cli/skin_engine.py).
+# Install: <home>/skins/friday-emerald.yaml, select via
+# `display.skin: friday-emerald` (or `jarvis-persona friday`).
+
+name: friday-emerald
+description: Brisk aide — emerald on deep slate, warm and precise
+
+colors:
+  background: "#0b1210"
+  banner_accent: "#34D399"
+  banner_title: "#D1FAE5"
+  banner_text: "#ECFDF5"
+  banner_dim: "#059669"
+  banner_border: "#065F46"
+  ui_accent: "#34D399"
+  ui_border: "#065F46"
+  prompt: "#ECFDF5"
+  input_rule: "#059669"
+  response_border: "#34D399"
+  status_bar_bg: "#0d1512"
+  status_bar_text: "#C9D6CF"
+  status_bar_strong: "#34D399"
+  status_bar_dim: "#5F7A6D"
+  ui_ok: "#6EE7B7"
+  ui_warn: "#FBBF24"
+  ui_error: "#ef5350"
+  session_label: "#10B981"
+  session_border: "#065F46"
+
+spinner:
+  thinking_verbs:
+    - lining it up
+    - on it already
+    - pulling the thread
+    - checking the board
+    - keeping it brisk
+    - dotting the i's
+    - right behind you
+    - making it so
+
+branding:
+  agent_name: Friday
+  welcome: Morning, boss. Friday here — what's first?
+  goodbye: Standing by, boss. Just say the word.
+  response_label: " ◆ Friday "
+  prompt_symbol: "◆"
+  help_header: "(◆) Available Commands"
+
+tool_prefix: "┊"

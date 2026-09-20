@@ -1,0 +1,23 @@
+# Multilingual Edge voice map (W12) — reply in the user's language where engines allow.
+# Edge IDs live-verified via `edge-tts --list-voices` 2026-09-20; OpenAI voices
+# are multilingual by model (same voice ID, any supported language). Lookup:
+# soul/depth.py voice_for(soul, lang). Unknown language -> soul default
+# (honest fallback, never a guessed voice ID).
+es:
+  edge:
+    voice: es-ES-ElviraNeural
+fr:
+  edge:
+    voice: fr-FR-DeniseNeural
+de:
+  edge:
+    voice: de-DE-KatjaNeural
+hi:
+  edge:
+    voice: hi-IN-SwaraNeural
+it:
+  edge:
+    voice: it-IT-ElsaNeural
+pt:
+  edge:
+    voice: pt-BR-FranciscaNeural
