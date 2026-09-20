@@ -1,0 +1,58 @@
+#!/usr/bin/env sh
+# jarvis voice-status — honest capability flags (W2).
+#
+# Probes live, never fakes: each line reports real|absent based on an actual
+# import/device check in the W0 venv. Absent backends surface as absent
+# (the voice loop degrades to text chat); nothing synthesizes fake audio.
+# Respects HERMES_HOME (defaults to ~/.jarvis, like jarvis/bin/jarvis).
+set -u
+
+: "${HERMES_HOME:=$HOME/.jarvis}"
+export HERMES_HOME
+
+VENV_PY="/home/runner/.venvs/jarvis-w0/bin/python"
+if [ ! -x "$VENV_PY" ]; then
+  VENV_PY="python3"
+fi
+
+"$VENV_PY" - <<'EOF'
+import os
+
+def have(mod):
+    try:
+        __import__(mod)
+        return True
+    except Exception:
+        return False
+
+stt = "real" if have("faster_whisper") else "absent"
+tts = "real" if have("edge_tts") else "absent"
+
+wake_reason = ""
+if not have("openwakeword"):
+    wake_reason = " (openwakeword lib missing)"
+else:
+    try:
+        import sounddevice  # noqa: F401
+        wake_reason = ""
+    except Exception:
+        wake_reason = " (no audio input device)"
+wake = "absent" + wake_reason if wake_reason else "real"
+
+try:
+    import sounddevice as sd
+    sd.query_devices()
+    mic = "real"
+except Exception:
+    mic = "absent (PortAudio/device missing)"
+
+print(f"stt: {stt}")
+print(f"tts: {tts}")
+print(f"wake: {wake}")
+print(f"mic: {mic}")
+EOF
+
+persona="$(hermes config get display.personality 2>/dev/null || echo unknown)"
+skin="$(hermes config get display.skin 2>/dev/null || echo unknown)"
+echo "persona: ${persona:-none}"
+echo "skin: ${skin:-default}"
