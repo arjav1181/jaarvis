@@ -1,0 +1,49 @@
+# Jarvis-gold — warm gold, calm service. Inherits the default skin;
+# only overridden keys are listed here (see hermes_cli/skin_engine.py).
+# Install: <home>/skins/jarvis-gold.yaml, select via `display.skin: jarvis-gold`.
+
+name: jarvis-gold
+description: Loyal butler — warm gold on deep brown, calm and precise
+
+colors:
+  background: "#14100a"
+  banner_accent: "#FFD700"
+  banner_title: "#FFE9A3"
+  banner_text: "#FFF8DC"
+  banner_dim: "#B8860B"
+  banner_border: "#8B6914"
+  ui_accent: "#FFD700"
+  ui_border: "#8B6914"
+  prompt: "#FFF8DC"
+  input_rule: "#B8860B"
+  response_border: "#FFD700"
+  status_bar_bg: "#1a1408"
+  status_bar_text: "#E8DCC0"
+  status_bar_strong: "#FFD700"
+  status_bar_dim: "#8A7A4A"
+  ui_ok: "#8FBC8F"
+  ui_warn: "#FFD700"
+  ui_error: "#ef5350"
+  session_label: "#DAA520"
+  session_border: "#8B6914"
+
+spinner:
+  thinking_verbs:
+    - attending
+    - preparing
+    - polishing the silver
+    - consulting the ledger
+    - laying out the options
+    - keeping it precise
+    - at your service
+    - seeing to it
+
+branding:
+  agent_name: Jarvis
+  welcome: Welcome, sir. Jarvis at your service — type your message or /help for commands.
+  goodbye: At your service, sir. Goodbye.
+  response_label: " ◆ Jarvis "
+  prompt_symbol: "◆"
+  help_header: "(◆) Available Commands"
+
+tool_prefix: "┊"

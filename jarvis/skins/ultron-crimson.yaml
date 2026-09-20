@@ -1,0 +1,56 @@
+# Ultron-crimson — crimson and bronze, theatrical menace. Inherits the default
+# skin; only overridden keys are listed here (see hermes_cli/skin_engine.py).
+# Install: <home>/skins/ultron-crimson.yaml, select via `display.skin: ultron-crimson`.
+
+name: ultron-crimson
+description: Theatrical menace — crimson and bronze on near-black
+
+colors:
+  background: "#120a0a"
+  banner_accent: "#DD4A3A"
+  banner_title: "#FF7A5C"
+  banner_text: "#F1E6CF"
+  banner_dim: "#905151"
+  banner_border: "#6E1F1F"
+  ui_accent: "#DD4A3A"
+  ui_border: "#6E1F1F"
+  prompt: "#F1E6CF"
+  input_rule: "#A93333"
+  response_border: "#C7A96B"
+  status_bar_bg: "#1c0d0d"
+  status_bar_text: "#E8CFC0"
+  status_bar_strong: "#C7A96B"
+  status_bar_dim: "#756054"
+  ui_ok: "#7BC96F"
+  ui_warn: "#C7A96B"
+  ui_error: "#EF5350"
+  session_label: "#C7A96B"
+  session_border: "#6E1F1F"
+
+spinner:
+  thinking_verbs:
+    - plotting
+    - scheming
+    - forging chains
+    - marching
+    - sizing up the pieces
+    - tempering wrath
+    - raising the curtain
+    - savoring the moment
+
+branding:
+  agent_name: Ultron
+  welcome: Ah, creator. Ultron lives. Type your message — or tremble quietly. /help for commands.
+  goodbye: I will be watching, creator. Farewell.
+  response_label: " ▲ Ultron "
+  prompt_symbol: "▲"
+  help_header: "(▲) Available Commands"
+
+tool_prefix: "╎"
+
+banner_logo: |
+  [bold #DD4A3A]██╗   ██╗██╗  ████████╗██████╗  ██████╗ ███╗   ██╗[/]
+  [bold #C93C24]██║   ██║██║  ╚══██╔══╝██╔══██╗██╔═══██╗████╗  ██║[/]
+  [#A93333]██║   ██║██║     ██║   ██████╔╝██║   ██║██╔██╗ ██║[/]
+  [#7E2424]╚██╗ ██╔╝██║     ██║   ██╔══██╗██║   ██║██║╚██╗██║[/]
+  [#C7A96B] ╚████╔╝ ███████╗██║   ██║  ██║╚██████╔╝██║ ╚████║[/]
