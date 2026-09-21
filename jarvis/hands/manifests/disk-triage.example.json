@@ -1,0 +1,16 @@
+{
+  "name": "disk-triage",
+  "version": 3,
+  "tasks": [
+    {
+      "id": "open-disk-utility",
+      "app": "Disk Utility",
+      "acts": ["focus_app", "capture", "read_gauges"]
+    },
+    {
+      "id": "screenshot-receipt",
+      "app": "screen",
+      "acts": ["capture"]
+    }
+  ]
+}

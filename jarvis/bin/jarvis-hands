@@ -1,0 +1,76 @@
+#!/usr/bin/env python3
+"""jarvis-hands — W11 hands CLI (JSON out). computer | ssh | telegram | car-home | kill."""
+import argparse
+import json
+import sys
+from pathlib import Path
+
+REPO = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(REPO))
+
+from jarvis.hands import car_home as _car
+from jarvis.hands import computer as _comp
+from jarvis.hands import kill as _kill
+from jarvis.hands import ssh_fleet as _ssh
+from jarvis.hands import telegram_remote as _tg
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    sub = ap.add_subparsers(dest="cmd", required=True)
+
+    c = sub.add_parser("computer")
+    c.add_argument("op", choices=("status", "enable", "disable", "run-plan", "yolo"))
+    c.add_argument("--manifest", default="")
+    c.add_argument("--goal", default="")
+    c.add_argument("--i-accept-desktop-risk", action="store_true")
+
+    s = sub.add_parser("ssh")
+    s.add_argument("op", choices=("status", "plan"))
+    s.add_argument("--host", default="")
+    s.add_argument("--command", default="")
+
+    t = sub.add_parser("telegram")
+    t.add_argument("op", choices=("status", "act", "pending"))
+    t.add_argument("--summary", default="")
+    t.add_argument("--id", default="")
+
+    sub.add_parser("car-home").add_argument("op", choices=("status",))
+
+    k = sub.add_parser("kill")
+    k.add_argument("op", choices=("all", "gates"))
+    k.add_argument("--reason", default="operator kill")
+    a = ap.parse_args()
+
+    if a.cmd == "computer":
+        if a.op == "status":
+            res = _comp.status()
+        elif a.op == "enable":
+            res = _comp.enable(a.manifest, accept_risk=a.i_accept_desktop_risk)
+        elif a.op == "disable":
+            res = _comp.disable()
+        elif a.op == "run-plan":
+            res = _comp.run_plan(a.manifest, a.goal)
+        else:
+            res = _comp.yolo()
+    elif a.cmd == "ssh":
+        res = _ssh.status() if a.op == "status" else _ssh.plan(a.host, a.command)
+    elif a.cmd == "telegram":
+        if a.op == "status":
+            res = _tg.status()
+        elif a.op == "act":
+            res = _tg.act(a.summary, a.id)
+        else:
+            res = {"pending": _tg.pending()}
+    elif a.cmd == "car-home":
+        res = _car.status()
+    else:
+        res = _kill.kill_all(a.reason) if a.op == "all" else {"gates": _kill.gates()}
+    print(json.dumps(res, indent=2))
+    if isinstance(res, dict) and res.get("ok") is False:
+        return 2
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
