@@ -85,3 +85,41 @@ it would break single-port forwarding and need its own auth story.
   narration excluded from the stamp).
 - **Soul**: read once at login from `/api/config display.personality`
   (drives narration lines; TTS voice itself stays server-side per soul).
+
+## W13 — the face (HUD.md identity spec, this page)
+
+- **Arc-reactor orb** (`<canvas id="orb">`, `setOrb`/`drawOrb`): honest modes
+  only — `idle` pulse whose period stretches with a real 30 s heartbeat poll
+  (`GET /api/sessions?limit=1`, sends no content; orb dims while heartbeats
+  miss), `listening` rings expanded by the LIVE mic analyser peak (any mic
+  error latches `frozen` and drops to idle — never fake listening),
+  `thinking` arcs whose segment count = the live `tool.generating` count
+  (arcs dim after 10 s with no run event = the run stalled), `speaking`
+  waveform driven by the real `<audio>` playback position (`ontimeupdate`;
+  barge-in collapses it synchronously), `stopped` ember + `STOPPED` banner
+  latched by kill until the next real work. Palettes mirror the server skins
+  (jarvis gold/blue, ultron crimson/bronze + sharper chorded geometry and a
+  slower pulse, friday emerald); the soul flips the palette instantly on the
+  same orb. `prefers-reduced-motion` → static glow + text states.
+- **Voice of the interface**: every status/note/empty/error line comes from
+  a per-soul `COPY` map (same facts, soul tone; Friday `boss`, Ultron menace
+  with identical numbers). Empty thread: "No memories yet, sir — give me
+  something worth remembering." Mic denial: "The microphone declined, sir —
+  check the browser permission." (+ OS error text, all three souls).
+- **Capability surfacing**: memory indicator parses W12 cited callbacks
+  (`(memory #N)`) out of the just-finished reply into "I recall N relevant
+  memories, sir" + native expandable citation list (no citations heard, no
+  claim); every reply meta carries `ENGINE[stt:<real> tts:<real>]` providers
+  from the actual transcribe/speak responses plus measured wall-clock ms
+  beside the existing honest `SPEAK[…]` labels; Household-orders fieldset
+  (Voice orders verbose/normal/silent with plain-English consequences, Soul
+  allegiance read-only from server config, Safety Butler display-only — L2
+  enforcement stays server-side, voice never widens permissions); kill is a
+  full-width red reactor-shutdown, one tap, never disabled once logged in.
+- **Narration rotation**: `NARR` embeds the `jarvis/personas/narration.yml`
+  sets verbatim (W4 triplets as rotation heads — day-one lines unchanged),
+  cycling per milestone; speech-only as in W4.
+- **Layout**: orb top-center, thread below, controls sticky in the bottom
+  thumb-zone under 480 px, 360 px-first, system fonts, zero external requests
+  (asserted: no http/links/images/url()/imports), `aria-live` thread + orb
+  label, ≥48 px targets.

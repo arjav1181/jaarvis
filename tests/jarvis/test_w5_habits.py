@@ -4,8 +4,9 @@ Covers: repeatable skill port (deterministic, committed == generated,
 manifest shas), Hermes frontmatter validity, /learn KB skill (verbatim
 references, no secrets), cron job specs (schedules parse via the real
 cron.jobs parser, pins + continuity + delivery set, monitor stability
-contract), kanban board spec (profiles, PR contracts), curator pins,
-overlay-only discipline, W4 untouched.
+ contract), kanban board spec (profiles, PR contracts), curator pins,
+ overlay-only discipline, W4 test-contracts untouched (voice.html evolves
+ under W13 — see test_w13_face.py).
 """
 import hashlib
 import json
@@ -198,7 +199,11 @@ def test_no_core_files_touched():
 
 
 def test_w4_files_untouched():
-    for path in ("jarvis/hud/voice.html", "tests/jarvis/test_w4_talk.py",
+    # W13 supersedes the voice.html pin: the HUD face wave intentionally
+    # evolves jarvis/hud/voice.html (see tests/jarvis/test_w13_face.py).
+    # The W4 *test contracts* stay pinned — W3/W4 suites still run green
+    # against the evolved page, which is the real guard.
+    for path in ("tests/jarvis/test_w4_talk.py",
                  "tests/jarvis/test_w3_bvoice.py"):
         r = subprocess.run(["git", "diff", "--quiet", "origin/jarvis", "--", path],
                            cwd=REPO_ROOT, capture_output=True, text=True)
