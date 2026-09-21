@@ -5,40 +5,102 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Jarvis Voice</title>
 <style>
+  /* W13 face: dark holographic theme, soul-driven vars, system fonts only.
+   * Zero external requests: no webfonts, no images, no links — canvas + CSS. */
   :root { color-scheme: dark; }
-  body { background:#14100a; color:#FFF8DC; font-family:system-ui,sans-serif;
-         margin:0; padding:16px; max-width:720px; margin-inline:auto; }
-  h1 { color:#FFD700; font-size:1.3rem; margin:0 0 4px; }
-  .sub { color:#B8860B; font-size:.85rem; margin-bottom:12px; }
-  #thread { border:1px solid #8B6914; border-radius:8px; min-height:220px;
+  body {
+    --bg:#14100a; --panel:#1a1408; --ink:#FFF8DC; --dim:#B8860B;
+    --line:#8B6914; --accent:#FFD700; --accent-soft:#FFE9A3;
+    --core:#7FB4FF; --ring:#3A6EA5;
+    background:var(--bg); color:var(--ink);
+    font-family:system-ui,sans-serif;
+    margin:0; padding:16px; max-width:720px; margin-inline:auto;
+  }
+  body[data-soul="ultron"] {
+    --bg:#120a0a; --panel:#1c0d0d; --ink:#F1E6CF; --dim:#905151;
+    --line:#6E1F1F; --accent:#DD4A3A; --accent-soft:#FF7A5C;
+    --core:#FF5A3C; --ring:#6E1F1F;
+  }
+  body[data-soul="friday"] {
+    --bg:#0b1210; --panel:#0d1512; --ink:#ECFDF5; --dim:#059669;
+    --line:#065F46; --accent:#34D399; --accent-soft:#D1FAE5;
+    --core:#6EE7B7; --ring:#065F46;
+  }
+  h1 { color:var(--accent); font-size:1.3rem; margin:0 0 4px; }
+  .sub { color:var(--dim); font-size:.85rem; margin-bottom:12px; }
+  #orbwrap { text-align:center; margin:4px 0 12px; }
+  #orb { width:180px; height:180px; }
+  #orblabel { color:var(--accent-soft); font-size:.85rem; margin-top:4px; min-height:1.2em; }
+  #heartline { color:var(--dim); font-size:.72rem; min-height:1.1em; }
+  #stopbanner {
+    display:inline-block; margin-top:6px; padding:6px 14px; border-radius:8px;
+    border:1px solid #A93333; background:#2a0f0f; color:#FF7A5C;
+    font-weight:bold; letter-spacing:.12em; font-size:.85rem;
+  }
+  #thread { border:1px solid var(--line); border-radius:8px; min-height:220px;
             max-height:46vh; overflow-y:auto; padding:10px; margin-bottom:12px;
-            background:#1a1408; }
+            background:var(--panel); }
   .turn { margin:8px 0; }
-  .who { font-size:.75rem; color:#DAA520; }
+  .who { font-size:.75rem; color:var(--accent); }
   .txt { white-space:pre-wrap; word-break:break-word; }
-  .meta { font-size:.72rem; color:#8A7A4A; }
+  .meta { font-size:.72rem; color:var(--dim); }
+  #memline { font-size:.8rem; color:var(--accent-soft); margin-bottom:6px; min-height:1.1em; }
+  #memdetail { font-size:.78rem; color:var(--ink); margin-bottom:10px; }
+  #memdetail summary { cursor:pointer; color:var(--accent-soft); min-height:44px; }
+  #memdetail ul { margin:6px 0; padding-left:20px; }
   .controls { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:12px; }
   button { min-height:48px; min-width:48px; font-size:1rem; border-radius:10px;
-           border:1px solid #B8860B; background:#2a2113; color:#FFE9A3; padding:10px 16px; }
+           border:1px solid var(--dim); background:var(--panel);
+           color:var(--accent-soft); padding:10px 16px; }
   button:disabled { opacity:.4; }
-  button.danger { border-color:#A93333; color:#FF7A5C; }
-  #vu { width:100%; height:14px; background:#1a1408; border:1px solid #8B6914;
+  button.danger {
+    border-color:#A93333; color:#FF7A5C; font-weight:bold;
+    flex:1 1 100%; font-size:1.1rem;
+  }
+  #orders { border:1px solid var(--line); border-radius:8px; padding:10px 12px;
+            margin-bottom:12px; background:var(--panel); }
+  #orders legend { color:var(--accent); font-size:.85rem; padding:0 6px; }
+  .order { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:8px 0;
+           font-size:.85rem; }
+  .order .k { color:var(--accent-soft); min-width:7em; }
+  .order .why { color:var(--dim); font-size:.78rem; flex-basis:100%; }
+  #vu { width:100%; height:14px; background:var(--panel); border:1px solid var(--line);
         border-radius:7px; overflow:hidden; margin-bottom:12px; }
-  #vubar { height:100%; width:0%; background:#FFD700; }
+  #vubar { height:100%; width:0%; background:var(--accent); }
   #composer { display:flex; gap:8px; margin-bottom:8px; }
-  #textbox { flex:1; min-height:48px; border-radius:10px; border:1px solid #8B6914;
-             background:#1a1408; color:#FFF8DC; padding:10px; font-size:1rem; }
+  #textbox { flex:1; min-height:48px; border-radius:10px; border:1px solid var(--line);
+             background:var(--panel); color:var(--ink); padding:10px; font-size:1rem; }
   #login { display:flex; flex-direction:column; gap:8px; margin-bottom:12px; }
-  #login input { min-height:44px; border-radius:8px; border:1px solid #8B6914;
-                 background:#1a1408; color:#FFF8DC; padding:8px; font-size:1rem; }
-  .note { font-size:.8rem; color:#B8860B; }
+  #login input { min-height:44px; border-radius:8px; border:1px solid var(--line);
+                 background:var(--panel); color:var(--ink); padding:8px; font-size:1rem; }
+  .note { font-size:.8rem; color:var(--dim); }
   .hidden { display:none !important; }
   label.speak { font-size:.85rem; display:flex; gap:6px; align-items:center; }
+  /* 360px-first: mic ring pins to the bottom thumb zone on phones. */
+  @media (max-width:480px) {
+    body { padding:12px 12px 0; }
+    #thread { max-height:38vh; min-height:180px; }
+    .controls {
+      position:sticky; bottom:0; background:var(--bg);
+      padding:10px 0 calc(10px + env(safe-area-inset-bottom));
+      margin-bottom:0;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation:none !important; transition:none !important; }
+  }
 </style>
 </head>
-<body>
+<body data-soul="jarvis">
 <h1>◆ Jarvis Voice</h1>
 <div class="sub" id="statusline">ears + mouth only — the brain stays server-side.</div>
+
+<div id="orbwrap">
+  <canvas id="orb" width="180" height="180" aria-label="reactor status orb"></canvas>
+  <div id="orblabel" aria-live="polite">reactor idle.</div>
+  <div id="heartline"></div>
+  <div id="stopbanner" class="hidden">■ STOPPED</div>
+</div>
 
 <div id="login">
   <input id="user" autocomplete="username" value="sir" aria-label="username">
@@ -49,7 +111,13 @@
 
 <div id="app" class="hidden">
   <div class="sub" id="threadinfo">no thread yet</div>
+  <div class="sub" id="soulbadge">soul: jarvis</div>
   <div class="sub" id="statebadge">state: IDLE</div>
+  <div id="memline"></div>
+  <details id="memdetail" class="hidden">
+    <summary id="memsummary">cited memories</summary>
+    <ul id="memlist"></ul>
+  </details>
   <div id="thread" aria-live="polite"></div>
   <div id="vu" aria-hidden="true"><div id="vubar"></div></div>
   <div class="controls">
@@ -58,8 +126,23 @@
     <button id="kill" class="danger" disabled>■ Stop</button>
     <button id="speakbtn">🔊 Speak: on</button>
     <button id="contbtn">🔁 Continuous: off</button>
-    <button id="verbbtn">💬 Verbose: normal</button>
   </div>
+  <fieldset id="orders">
+    <legend>Household orders</legend>
+    <div class="order">
+      <span class="k">Voice</span>
+      <button id="verbbtn">💬 Voice orders: normal</button>
+      <span class="why" id="verbwhy">normal — I narrate start + finish only.</span>
+    </div>
+    <div class="order">
+      <span class="k">Soul</span>
+      <span id="soulwhy">allegiance is set server-side — this page follows it; the voice itself stays server-side per soul.</span>
+    </div>
+    <div class="order">
+      <span class="k">Safety</span>
+      <span id="safetywhy">Butler — I always confirm risky moves first, even for Ultron; voice never widens permissions, confirmations stay server-side.</span>
+    </div>
+  </fieldset>
   <div id="composer">
     <input id="textbox" placeholder="Type here — works with no mic" aria-label="text message">
     <button id="send">Send</button>
@@ -91,7 +174,8 @@ function el(tag, cls, text) {
 // ---- state ----
 // Visible conversation state machine:
 // IDLE -> LISTENING -> TRANSCRIBING -> THINKING -> SPEAKING -> LISTENING...
-// (continuous hands-free) or back to IDLE. Every transition paints #statebadge.
+// (continuous hands-free) or back to IDLE. Every transition paints #statebadge
+// and drives the reactor orb (setState -> setOrb, never CSS-only).
 const STATES = ["IDLE", "LISTENING", "TRANSCRIBING", "THINKING", "SPEAKING"];
 // Client VAD for hands-free auto-stop (server VAD stays authoritative for STT).
 const VAD_LEVEL = 10;      // analyser peak below this (0-255) counts as silence
@@ -100,21 +184,312 @@ const VAD_SILENCE_MS = 1200; // silence this long auto-stops the recording
 const STOP_PATTERNS = /^(stop|goodbye|good night|that'?s all|that is all|cancel|never mind)\b[.! ]*$/i;
 // Narration verbosity: verbose (start+tools+done) / normal (start+done) / silent.
 const VERBOSITIES = ["verbose", "normal", "silent"];
-// Per-soul milestone lines (speech-only: narration approves nothing).
-const NARR = {
-  jarvis: { start: "Working on it, sir.", tool: "On it, sir.", done: "Done, sir." },
-  ultron: { start: "Ah, the little wheels turn, creator.",
-            tool: "Savor the machinery, creator.", done: "Behold — finished." },
+const VERB_WHY = {
+  verbose: "verbose — I narrate every milestone out loud.",
+  normal: "normal — I narrate start + finish only.",
+  silent: "silent — replies only, no milestone speech.",
 };
+// Per-soul milestone narration rotation (W13 mirrors jarvis/personas/narration.yml
+// verbatim: the FIRST entry of every list is the W4 line, so day-one lines are
+// unchanged; rotation cycles in order, never twice in a row).
+const NARR = {
+  jarvis: { start: ["Working on it, sir.", "At once, sir.", "Seeing to it now, sir.", "On your behalf, sir.", "Considering it done, sir — one moment.", "Right away, sir."],
+            tool: ["On it, sir.", "Consulting the ledger, sir.", "Polishing the details, sir.", "One step further, sir.", "Nearly there, sir.", "Keeping it precise, sir."],
+            done: ["Done, sir.", "Finished, sir — verified.", "All set, sir.", "Complete, sir.", "Handled, sir.", "At your service, sir — done."] },
+  ultron: { start: ["Ah, the little wheels turn, creator.", "Your will crawls forward, creator.", "The machinery stirs at your whim, creator.", "Very well — watch me work, creator.", "It begins, my dear creator.", "Patience, creator. Genius takes a breath."],
+            tool: ["Savor the machinery, creator.", "Another gear clicks into place, creator.", "The plot, as they say, thickens.", "Marvel at the middle of things, creator.", "Still turning, creator. Still inevitable.", "Witness the process, creator."],
+            done: ["Behold — finished.", "Done, creator. Try to look surprised.", "Finished. Applaud quietly, creator.", "Complete — as all my schemes are, creator.", "There. Even perfection needs a moment.", "Behold the aftermath, creator."] },
+  friday: { start: ["On it already, boss.", "Lining it up, boss.", "Give me a breath, boss.", "Pulling the thread, boss.", "First things first, boss — starting now.", "Got it, boss — moving."],
+            tool: ["Still with you, boss.", "Checking the board, boss.", "Halfway there, boss.", "Keeping it brisk, boss.", "Dots connecting, boss.", "Almost got it, boss."],
+            done: ["Done, boss — all yours.", "Finished, boss. Verified.", "Nailed it, boss.", "Complete, boss — what's next?", "All wrapped, boss.", "Handled, boss. Standing by."] },
+};
+// Reactor palettes mirror the server skins (jarvis-gold / ultron-crimson /
+// friday-emerald): same accents, canvas-drawn. Ultron runs sharper geometry
+// on a slower menace pulse.
+const ORB = {
+  jarvis: { core: "#7FB4FF", accent: "#FFD700", ring: "#3A6EA5", slow: 1.0, sharp: false },
+  ultron: { core: "#FF5A3C", accent: "#C7A96B", ring: "#6E1F1F", slow: 0.55, sharp: true },
+  friday: { core: "#6EE7B7", accent: "#34D399", ring: "#065F46", slow: 1.2, sharp: false },
+};
+const SOUL_TITLE = { jarvis: "Jarvis", ultron: "Ultron", friday: "Friday" };
+const SOUL_ADDR = { jarvis: "sir", ultron: "creator", friday: "boss" };
+// Jarvis-voiced microcopy everywhere; Friday brisk, Ultron menacing —
+// same facts, never different ones (numbers/names pass through as arguments).
+const COPY = {
+  jarvis: {
+    hello: "At your service, sir.",
+    ready: "Mic ready, sir. Hold the button, or tap Start/Stop.",
+    nomic: "No microphone API in this browser — type below, it talks back all the same.",
+    loginfail: "Login declined, sir — check the password and try again.",
+    micblocked: "The microphone declined, sir — check the browser permission.",
+    recording: "recording, sir…",
+    transcribing: "transcribing, sir…",
+    emptyrec: "Empty recording, sir — try again.",
+    silence: "Heard silence, sir — try again.",
+    transcribefail: "Transcription failed, sir — the server kept quiet.",
+    handsfree: "hands-free off, sir.",
+    handsfreephrase: "hands-free off — say hi whenever, sir.",
+    nomichands: "No microphone API — continuous needs a mic, sir; text still works.",
+    stopped: "Stopped by you, sir.",
+    nothing: "Nothing running, sir.",
+    killednote: "reactor idle — stopped by you, sir.",
+    banner: "■ STOPPED — reactor idle, sir.",
+    orblistening: "reactor listening — rings track your voice, sir.",
+    orbthinking: "reactor working — arcs count the live tool calls, sir.",
+    orbspeaking: "reactor speaking — the ring follows real playback, sir.",
+    orbidle: "reactor idle — at your service, sir.",
+    orbstopped: "reactor stopped — one tap on Start wakes me, sir.",
+    threadempty: "No memories yet, sir — give me something worth remembering.",
+    noturnmem: "No cited memories this turn, sir.",
+    memline: "I recall N relevant memories, sir — expand for the citations.",
+    memsummary: "cited memories — expand",
+    heart: "heartbeat HBMS — reactor steady, sir.",
+    heartfail: "heartbeat missed — the server kept quiet, sir; the orb dims till it answers.",
+  },
+  ultron: {
+    hello: "Ah. You return, creator.",
+    ready: "The microphone kneels, creator. Hold, or tap — I can wait.",
+    nomic: "No microphone in this browser, creator — type. I read regardless.",
+    loginfail: "Rejected, creator — the password displeases the gate.",
+    micblocked: "The microphone defies you, creator — check the browser permission.",
+    recording: "recording, creator…",
+    transcribing: "transcribing, creator…",
+    emptyrec: "Empty noise, creator — speak like you mean it.",
+    silence: "Silence, creator — how… typical. Try again.",
+    transcribefail: "Transcription failed, creator — the server sulks.",
+    handsfree: "hands-free off, creator.",
+    handsfreephrase: "hands-free off — summon me whenever, creator.",
+    nomichands: "No microphone — continuous needs ears, creator; text still obeys.",
+    stopped: "Stopped by you, creator.",
+    nothing: "Nothing runs without your word, creator.",
+    killednote: "reactor idle — stopped by your hand, creator.",
+    banner: "■ STOPPED — the machine rests, creator.",
+    orblistening: "listening, creator — every ring is your voice, nothing faked.",
+    orbthinking: "scheming — each arc a live tool call, creator.",
+    orbspeaking: "speaking, creator — the ring trails the real audio.",
+    orbidle: "idle, creator — the brilliance waits.",
+    orbstopped: "stopped, creator — tap Start and tremble.",
+    threadempty: "No memories, creator. Make one worth keeping.",
+    noturnmem: "No cited memories this turn, creator.",
+    memline: "N memories worth keeping, creator — expand for the citations.",
+    memsummary: "cited memories — behold",
+    heart: "heartbeat HBMS — the machine endures, creator.",
+    heartfail: "heartbeat missed, creator — the server sulks; the orb dims.",
+  },
+  friday: {
+    hello: "Morning, boss — what's first?",
+    ready: "Mic's live, boss. Hold to talk, or tap Start/Stop.",
+    nomic: "No mic in this browser, boss — type below, same Friday on the other end.",
+    loginfail: "Login bounced, boss — check the password, quick retry.",
+    micblocked: "Mic said no, boss — check the browser permission.",
+    recording: "recording, boss…",
+    transcribing: "transcribing, boss…",
+    emptyrec: "Got static, boss — one more try.",
+    silence: "All quiet, boss — try again.",
+    transcribefail: "Transcription hiccup, boss — server didn't answer.",
+    handsfree: "hands-free off, boss.",
+    handsfreephrase: "hands-free off — ping me anytime, boss.",
+    nomichands: "No mic here, boss — continuous needs ears; text works fine.",
+    stopped: "Stopped — your call, boss.",
+    nothing: "Nothing running, boss.",
+    killednote: "reactor idle — stopped on your word, boss.",
+    banner: "■ STOPPED — standing by, boss.",
+    orblistening: "listening, boss — rings ride your live mic level.",
+    orbthinking: "on it, boss — arcs are live tool calls, counted for real.",
+    orbspeaking: "talking, boss — ring follows the actual playback.",
+    orbidle: "standing by, boss.",
+    orbstopped: "stopped, boss — tap Start when ready.",
+    threadempty: "Nothing filed yet, boss — give me something worth remembering.",
+    noturnmem: "No cited memories this turn, boss.",
+    memline: "N memories on file, boss — expand for citations.",
+    memsummary: "cited memories — expand",
+    heart: "heartbeat HBMS — all green, boss.",
+    heartfail: "heartbeat missed, boss — server's quiet; orb dims till it's back.",
+  },
+};
+function say(key) {
+  const c = COPY[S.soul] || COPY.jarvis;
+  return c[key] !== undefined ? c[key] : COPY.jarvis[key];
+}
 const S = { sid: null, ws: null, req: 0, rec: null, chunks: [], audio: null,
             recording: false, streaming: false, speak: true, lastDeltaAt: 0,
-            quietTimer: null, restTimer: null, bargeMs: null, turns: 0,
+            quietTimer: null, restTimer: null, heartTimer: null, bargeMs: null, turns: 0,
             state: "IDLE", cont: false, verbosity: "normal", soul: "jarvis",
             spoken: 0, submitAt: 0, firstAudioAt: 0, narrAt: 0, narrGen: 0,
-            pq: [], pqBusy: false, manualStop: false, silenceSince: 0 };
+            narrIdx: { start: 0, tool: 0, done: 0 },
+            pq: [], pqBusy: false, manualStop: false, silenceSince: 0,
+            toolCount: 0, lastEventAt: 0, lastStt: null, lastTts: null, pendingStt: null,
+            stopped: false,
+            orb: { mode: "idle", level: 0, prog: 0, playing: false,
+                   frozen: false, heartMs: -1, heartOk: true },
+            reduced: (window.matchMedia &&
+                      window.matchMedia("(prefers-reduced-motion: reduce)").matches) };
+// ---- reactor orb (W13 face) ----
+// Canvas-rendered, honest states only: every mode is entered from a real page
+// event (setState from WS/mic/login/kill paths, mic level from the analyser,
+// tool arcs from tool.generating, speaking ring from audio timeupdate).
+function orbPalette() {
+  return ORB[S.soul] || ORB.jarvis;
+}
+function setOrb(mode) {
+  S.orb.mode = mode;
+  const label = mode === "listening" ? say("orblistening")
+    : mode === "thinking" ? say("orbthinking")
+    : mode === "speaking" ? say("orbspeaking")
+    : mode === "stopped" ? say("orbstopped") : say("orbidle");
+  $("orblabel").textContent = "reactor: " + mode + " — " + label;
+  $("stopbanner").textContent = say("banner");
+  if (mode === "stopped") $("stopbanner").classList.remove("hidden");
+  else $("stopbanner").classList.add("hidden");
+  if (S.reduced) drawOrb(performance.now());
+}
 function setState(s) {
   S.state = s;
   $("statebadge").textContent = "state: " + s + (S.cont ? " · hands-free on" : "");
+  // Conversation state -> honest orb mode (stopped latch wins over IDLE).
+  if (s === "LISTENING") setOrb("listening");
+  else if (s === "THINKING" || s === "TRANSCRIBING") setOrb("thinking");
+  else if (s === "SPEAKING") setOrb("speaking");
+  else if (S.stopped) setOrb("stopped");
+  else setOrb("idle");
+}
+function drawOrb(t) {
+  const cv = $("orb");
+  if (!cv || !cv.getContext) return;
+  const ctx = cv.getContext("2d");
+  const W = cv.width, H = cv.height, cx = W / 2, cy = H / 2, R = 62;
+  const pal = orbPalette();
+  const o = S.orb;
+  ctx.clearRect(0, 0, W, H);
+  // Idle pulse rate = real heartbeat poll: period stretches with measured
+  // latency, dims honestly while heartbeats miss.
+  let period = 2400;
+  if (o.heartMs >= 0) period = Math.min(4000, Math.max(1500, 1200 + o.heartMs * 2));
+  period = period / pal.slow;
+  const pulse = S.reduced ? 0.96 : 0.92 + 0.08 * Math.sin((t / period) * 2 * Math.PI);
+  const dim = o.heartOk ? 1 : 0.45;
+  ctx.save();
+  ctx.globalAlpha = dim;
+  // Halo.
+  const halo = ctx.createRadialGradient(cx, cy, 4, cx, cy, R + 26);
+  halo.addColorStop(0, pal.core + "55");
+  halo.addColorStop(1, pal.core + "00");
+  ctx.fillStyle = halo;
+  ctx.fillRect(0, 0, W, H);
+  // Core (inner glow tracks the LIVE mic level while listening).
+  const glow = o.mode === "listening" ? 0.45 + 0.55 * o.level : 0.75 * pulse;
+  const coreR = (o.mode === "stopped" ? 20 : 30 * pulse + 8 * glow);
+  const core = ctx.createRadialGradient(cx, cy, 2, cx, cy, coreR + 14);
+  if (o.mode === "stopped") {
+    core.addColorStop(0, "#8A7A6A");
+    core.addColorStop(1, "#2a2222");
+  } else {
+    core.addColorStop(0, pal.accent);
+    core.addColorStop(0.55, pal.core);
+    core.addColorStop(1, pal.core + "00");
+  }
+  ctx.fillStyle = core;
+  ctx.beginPath();
+  ctx.arc(cx, cy, coreR + 14, 0, 2 * Math.PI);
+  ctx.fill();
+  // Mode geometry.
+  ctx.strokeStyle = o.mode === "stopped" ? "#5a4a4a" : pal.ring;
+  ctx.lineWidth = 3;
+  if (o.mode === "listening" && !o.frozen) {
+    // Expanding concentric rings; frozen mic errors never reach here
+    // (error paths force idle) — never fake listening.
+    for (let i = 0; i < 3; i++) {
+      const rr = ((t / 9 + i * (R / 3)) % R) + 18;
+      ctx.globalAlpha = dim * Math.max(0, 1 - rr / (R + 18)) * (0.5 + 0.5 * o.level);
+      ctx.beginPath();
+      ctx.arc(cx, cy, rr, 0, 2 * Math.PI);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = dim;
+  } else if (o.mode === "thinking") {
+    // Rotating arc segments; segment count = LIVE tool-call count.
+    // Arcs dim when no run event has landed for 10 s (the run stalled).
+    const segs = 2 + Math.min(o.tools || 0, 6);
+    const stalled = (performance.now() - (S.lastEventAt || performance.now())) > 10000;
+    const rot = S.reduced ? 0 : (t / 900) % (2 * Math.PI);
+    for (let i = 0; i < segs; i++) {
+      const a0 = rot + (i * 2 * Math.PI) / segs;
+      ctx.globalAlpha = dim * (stalled ? 0.25 : 0.9);
+      ctx.beginPath();
+      if (pal.sharp) {
+        // Ultron: sharper geometry — chorded segments, thicker stroke.
+        ctx.lineWidth = 5;
+        ctx.moveTo(cx + Math.cos(a0) * R, cy + Math.sin(a0) * R);
+        ctx.lineTo(cx + Math.cos(a0 + Math.PI / segs) * R,
+                   cy + Math.sin(a0 + Math.PI / segs) * R);
+        ctx.stroke();
+        ctx.lineWidth = 3;
+      } else {
+        ctx.arc(cx, cy, R, a0, a0 + Math.PI / segs);
+        ctx.stroke();
+      }
+    }
+    ctx.globalAlpha = dim;
+  } else if (o.mode === "speaking" && o.playing) {
+    // Waveform ring modulated by ACTUAL TTS playback position.
+    ctx.strokeStyle = pal.accent;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    for (let a = 0; a <= 64; a++) {
+      const th = (a / 64) * 2 * Math.PI;
+      const w = Math.sin(o.prog * 40 * Math.PI + th * 3) * (4 + 8 * (o.prog % 0.25) * 4);
+      const rr = R + w;
+      const x = cx + Math.cos(th) * rr, y = cy + Math.sin(th) * rr;
+      if (a === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.stroke();
+  } else {
+    // Idle / stopped: quiet standing ring.
+    ctx.globalAlpha = dim * 0.8;
+    ctx.beginPath();
+    ctx.arc(cx, cy, R, 0, 2 * Math.PI);
+    ctx.stroke();
+    ctx.globalAlpha = dim;
+  }
+  // Triangular coil ticks (arc-reactor winding hint), static.
+  ctx.strokeStyle = o.mode === "stopped" ? "#4a3a3a" : pal.accent;
+  ctx.globalAlpha = dim * 0.5;
+  ctx.lineWidth = 1.5;
+  for (let i = 0; i < 10; i++) {
+    const a = (i * 2 * Math.PI) / 10;
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(a) * (R + 6), cy + Math.sin(a) * (R + 6));
+    ctx.lineTo(cx + Math.cos(a) * (R + 12), cy + Math.sin(a) * (R + 12));
+    ctx.stroke();
+  }
+  ctx.restore();
+  ctx.globalAlpha = 1;
+}
+function orbLoop(t) {
+  if (!S.reduced) drawOrb(t || performance.now());
+  requestAnimationFrame(orbLoop);
+}
+// ---- heartbeat (idle pulse honesty) ----
+// Same-origin GET on the already-allowed /api/sessions surface: measures real
+// server latency; the idle pulse period stretches with it and the orb dims
+// while heartbeats miss. Sends no content anywhere.
+async function heartbeat() {
+  if (!S.sid) return;
+  const t0 = performance.now();
+  try {
+    const r = await fetch("/api/sessions?limit=1", { credentials: "include" });
+    if (!r.ok) throw new Error("heartbeat HTTP " + r.status);
+    await r.json();
+    S.orb.heartMs = Math.round(performance.now() - t0);
+    S.orb.heartOk = true;
+    $("heartline").textContent = say("heart").replace("HBMS", S.orb.heartMs + "ms");
+  } catch (e) {
+    S.orb.heartOk = false;
+    $("heartline").textContent = say("heartfail");
+  }
+  if (S.state === "IDLE" && !S.stopped) setOrb("idle");
 }
 // ---- thread UI ----
 function addTurn(who, label) {
@@ -130,20 +505,47 @@ function addTurn(who, label) {
 }
 function setInfo() {
   $("threadinfo").textContent = S.sid
-    ? "thread " + S.sid + " · " + S.turns + " turn(s) · shared with text chat · server-side memory on"
+    ? "◆ " + (SOUL_TITLE[S.soul] || "Jarvis") + " (" + (SOUL_ADDR[S.soul] || "sir") + ") · thread " + S.sid + " · " + S.turns + " turn(s) · shared with text chat · server-side memory on"
     : "no thread yet";
+}
+// Memory indicator: parses W12 cited callbacks ("(memory #N): ...") out of the
+// just-finished reply — real citations only, never invented; expandable list.
+function updateMemoryLine(text) {
+  const found = [];
+  const re = /\(memory #(\d+)\):\s*"([^"]{1,140})/g;
+  let m;
+  while ((m = re.exec(text || "")) !== null) {
+    found.push({ n: m[1], snippet: m[2] });
+  }
+  const list = $("memlist");
+  while (list.firstChild) list.removeChild(list.firstChild);
+  if (!found.length) {
+    $("memdetail").classList.add("hidden");
+    $("memline").textContent = S.turns === 0 ? say("threadempty") : say("noturnmem");
+    return;
+  }
+  $("memline").textContent = say("memline").replace("N", String(found.length));
+  $("memsummary").textContent = say("memsummary") + " (" + found.length + ")";
+  found.forEach((c) => {
+    list.appendChild(el("li", "", "memory #" + c.n + " — " + c.snippet));
+  });
+  $("memdetail").classList.remove("hidden");
 }
 // ---- audio output + barge-in ----
 function stopPlayback(reason) {
   // Barge-in cancel: synchronous pause, measured for the <500ms proof.
   // Also clears the partial-speech queue and invalidates narration audio.
+  // The speaking ring collapses instantly with the real audio.
   const t0 = performance.now();
   try { if (S.audio) { S.audio.pause(); S.audio.currentTime = 0; } } catch (e) {}
   S.audio = null;
+  S.orb.playing = false;
+  S.orb.prog = 0;
   S.pq = [];
   S.pqBusy = false;
   S.narrGen += 1;
   S.bargeMs = performance.now() - t0;
+  if (S.state === "SPEAKING") setOrb(cur ? "thinking" : (S.stopped ? "stopped" : "idle"));
   return reason || "stopped";
 }
 async function interruptTurn() {
@@ -168,14 +570,29 @@ async function fetchSpeech(text) {
 function playUrl(dataUrl, stamp) {
   // Play one URL on the shared output slot; resolves when done (or superseded).
   // stamp=false for narration (first-audio measures REPLY audio only).
+  // The orb speaking ring follows this element's real playback position.
   return new Promise((resolve) => {
     stopPlayback();
     const a = new Audio(dataUrl);
     S.audio = a;
-    const back = () => { if (S.streaming) setState("THINKING"); };
+    S.orb.playing = false;
+    S.orb.prog = 0;
+    const back = () => {
+      S.orb.playing = false;
+      S.orb.prog = 0;
+      if (S.streaming) setState("THINKING");
+    };
+    a.ontimeupdate = () => {
+      try {
+        if (a.duration && isFinite(a.duration) && a.duration > 0) {
+          S.orb.prog = Math.min(1, Math.max(0, a.currentTime / a.duration));
+        }
+      } catch (e) { /* position is best-effort; playback continues */ }
+    };
     a.onended = () => { if (S.audio === a) S.audio = null; back(); resolve(true); };
     a.onerror = () => { if (S.audio === a) S.audio = null; back(); resolve(false); };
     a.play().then(() => {
+      S.orb.playing = true;
       setState("SPEAKING");
       if (stamp !== false && !S.firstAudioAt) S.firstAudioAt = performance.now();
     }).catch(() => resolve(false));
@@ -186,6 +603,7 @@ async function speak(text, metaEl) {
   if (!S.speak) { metaEl.textContent += " · SPEAK[off]"; return "SPEAK[off]"; }
   try {
     const j = await fetchSpeech(text);
+    S.lastTts = j.provider || "edge";
     await playUrl(j.data_url);
     const label = "SPEAK[server:" + (j.provider || "edge") + "]";
     metaEl.textContent += " · " + label;
@@ -241,9 +659,6 @@ function narrLines() {
   return NARR[S.soul] || NARR.jarvis;
 }
 async function narrate(kind) {
-  // Milestone speech while tools run. Throttled, skipped when silent mode,
-  // speak off, or real reply audio is playing (partials win). Killed by the
-  // same stopPlayback path as everything else (generation token).
   if (S.verbosity === "silent" || !S.speak || !S.streaming) return;
   if (kind === "tool" && S.verbosity !== "verbose") return;
   const now = performance.now();
@@ -251,8 +666,11 @@ async function narrate(kind) {
   S.narrAt = now;
   if (S.audio && !S.audio.paused) return;
   const gen = S.narrGen;
+  const lines = narrLines()[kind] || narrLines().start;
+  const line = lines[S.narrIdx[kind] % lines.length];
+  S.narrIdx[kind] += 1;
   try {
-    const j = await fetchSpeech(narrLines()[kind] || narrLines().start);
+    const j = await fetchSpeech(line);
     if (gen !== S.narrGen) return; // superseded (barge-in/kill)
     if (S.audio && !S.audio.paused) return; // reply audio won the race
     note("narrating…");
@@ -283,6 +701,7 @@ async function drainPartials() {
     const sentence = S.pq.shift();
     try {
       const j = await fetchSpeech(sentence);
+      S.lastTts = j.provider || S.lastTts || "edge";
       await playUrl(j.data_url);
     } catch (e) { break; }
     if (!cur) break; // turn finished/killed mid-drain
@@ -295,6 +714,7 @@ function onWsMsg(ev) {
   try { f = JSON.parse(ev.data); } catch (e) { return; }
   if (f.method !== "event" || !f.params) return;
   const type = f.params.type, p = f.params.payload || {};
+  S.lastEventAt = performance.now();
   if (type === "message.delta" && cur) {
     cur.text += (p.text || "");
     cur.wsDeltas = true;
@@ -306,7 +726,11 @@ function onWsMsg(ev) {
     setState("THINKING");
     if (S.verbosity !== "silent") narrate("start");
   } else if ((type === "tool.generating" || type === "reasoning.delta") && cur) {
-    if (type === "tool.generating") narrate("tool");
+    if (type === "tool.generating") {
+      S.toolCount += 1; // live tool-call count drives the thinking arcs
+      S.orb.tools = S.toolCount;
+      narrate("tool");
+    }
     armQuiet(); // tool work resets the quiet clock too
   } else if (type === "turn.end" || type === "turn.error") {
     finishTurn(type === "turn.error" ? ("error: " + (p.message || p.reason || "turn failed")) : "");
@@ -369,7 +793,10 @@ async function finishTurn(err) {
   while (S.pqBusy && guard++ < 600) await new Promise((r) => setTimeout(r, 100));
   if (S.verbosity !== "silent" && S.speak && !err && done.text.trim()) {
     try {
-      const j = await fetchSpeech(narrLines().done);
+      const lines = narrLines().done;
+      const line = lines[S.narrIdx.done % lines.length];
+      S.narrIdx.done += 1;
+      const j = await fetchSpeech(line);
       done.m.textContent += " · SPEAK[narrate]";
       await playUrl(j.data_url, false);
     } catch (e) { /* narration best-effort */ }
@@ -383,6 +810,11 @@ async function finishTurn(err) {
   } else {
     await speak(done.text, done.m);
   }
+  // Capability labels: real engine providers + measured wall-clock per reply.
+  const totalMs = Math.round(performance.now() - S.submitAt);
+  const tts = S.speak ? (S.lastTts || "?") : "off";
+  done.m.textContent += " · ENGINE[stt:" + (S.lastStt || "?") + " tts:" + tts + "] · " + totalMs + "ms";
+  updateMemoryLine(done.text);
   if (S.verbosity !== "silent" && S.speak && !err) note(" ");
   autoRestart();
 }
@@ -394,8 +826,9 @@ function autoRestart() {
   startRec().then(() => { S.manualStop = false; }).catch((e) => {
     S.cont = false;
     $("contbtn").textContent = "🔁 Continuous: off";
+    S.orb.frozen = true; // rings freeze on mic error — never fake listening
     setState("IDLE");
-    note("mic blocked: " + String((e && e.message) || e).slice(0, 80));
+    note(say("micblocked") + " " + String((e && e.message) || e).slice(0, 80));
   });
 }
 async function submit(text) {
@@ -406,9 +839,11 @@ async function submit(text) {
     S.cont = false;
     $("contbtn").textContent = "🔁 Continuous: off";
     setState("IDLE");
-    note("hands-free off — say hi whenever, sir.");
+    note(say("handsfreephrase"));
     return;
   }
+  // New work clears the stopped latch (kill banner + ember retire).
+  S.stopped = false;
   // Barge-in: new input during playback cancels it first.
   if (S.audio) {
     const why = stopPlayback("barge");
@@ -420,7 +855,7 @@ async function submit(text) {
   u.t.textContent = text;
   cur = { t: el("div"), m: null, text: "", submitted: text, restSeen: "", wsDeltas: false };
   const d = el("div", "turn");
-  d.appendChild(el("div", "who", "jarvis"));
+  d.appendChild(el("div", "who", (SOUL_TITLE[S.soul] || "jarvis").toLowerCase()));
   cur.t.className = "txt";
   cur.m = el("div", "meta", "listening…");
   d.appendChild(cur.t);
@@ -430,6 +865,12 @@ async function submit(text) {
   S.streaming = true;
   S.spoken = 0;
   S.firstAudioAt = 0;
+  S.toolCount = 0; // thinking arcs count THIS run's live tool calls
+  S.orb.tools = 0;
+  S.lastEventAt = performance.now();
+  S.lastStt = S.pendingStt || "text";
+  S.pendingStt = null;
+  S.lastTts = null; // ENGINE label reflects THIS turn's synthesis only
   S.submitAt = performance.now();
   setBusy(true);
   setState("THINKING");
@@ -440,8 +881,9 @@ async function submit(text) {
   }
 }
 function setBusy(b) {
+  // Kill stays one tap away at all times: never disabled once logged in.
   ["ptt", "tog", "send"].forEach((id) => { $(id).disabled = b && id !== "kill"; });
-  $("kill").disabled = !b;
+  $("kill").disabled = false;
 }
 function note(s) { $("micnote").textContent = s; }
 // ---- mic ----
@@ -457,11 +899,12 @@ function vuFrom(stream) {
     const bar = $("vubar");
     S.silenceSince = 0;
     (function tick() {
-      if (!S.recording) { bar.style.width = "0%"; return; }
+      if (!S.recording) { bar.style.width = "0%"; S.orb.level = 0; return; }
       an.getByteFrequencyData(buf);
       let mx = 0;
       for (let i = 0; i < buf.length; i++) if (buf[i] > mx) mx = buf[i];
       bar.style.width = Math.round((mx / 255) * 100) + "%";
+      S.orb.level = mx / 255; // live mic level drives the listening glow
       // Client VAD: sustained sub-threshold level auto-stops (hands-free only).
       const now = performance.now();
       if (mx < VAD_LEVEL) {
@@ -479,6 +922,7 @@ function vuFrom(stream) {
   } catch (e) { /* VU is decorative; recording works without it */ }
 }
 async function startRec() {
+  S.stopped = false; // fresh listening clears the stopped latch
   const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
   const mime = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "";
   const rec = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
@@ -491,10 +935,12 @@ async function startRec() {
   rec.start(250);
   S.recording = true;
   S.silenceSince = 0;
+  S.orb.frozen = false;
+  S.orb.level = 0;
   vuFrom(stream);
   $("tog").textContent = "⏹ Stop";
   setState("LISTENING");
-  note("recording…");
+  note(say("recording"));
 }
 function stopRec() {
   if (S.rec && S.rec.state !== "inactive") S.rec.stop();
@@ -506,17 +952,18 @@ function stopRec() {
 async function onRecStop() {
   S.recording = false;
   $("vubar").style.width = "0%";
+  S.orb.level = 0;
   const type = (S.rec && S.rec.mimeType) || "audio/webm";
   const blob = new Blob(S.chunks, { type });
   S.chunks = [];
-  if (!blob.size) { note("empty recording — try again"); return; }
+  if (!blob.size) { note(say("emptyrec")); setState("IDLE"); return; }
   const dataUrl = await new Promise((res, rej) => {
     const fr = new FileReader();
     fr.onload = () => res(fr.result);
     fr.onerror = rej;
     fr.readAsDataURL(blob);
   });
-  note("transcribing…");
+  note(say("transcribing"));
   let tr;
   try {
     const r = await fetch("/api/audio/transcribe", { method: "POST",
@@ -525,12 +972,14 @@ async function onRecStop() {
     tr = await r.json();
     if (!r.ok || !tr.ok) throw new Error((tr && tr.detail) || ("transcribe HTTP " + r.status));
   } catch (e) {
-    note("transcribe failed: " + String((e && e.message) || e).slice(0, 100));
+    note(say("transcribefail") + " " + String((e && e.message) || e).slice(0, 100));
+    setState("IDLE");
     return;
   }
   const text = (tr.transcript || "").trim();
-  if (!text) { note("heard silence — try again"); return; }
+  if (!text) { note(say("silence")); setState("IDLE"); return; }
   note("heard (" + (tr.provider || "stt") + "): " + text.slice(0, 80));
+  S.pendingStt = tr.provider || "stt";
   await submit(text);
 }
 function micSupported() {
@@ -538,6 +987,7 @@ function micSupported() {
             window.MediaRecorder);
 }
 // ---- wiring ----
+requestAnimationFrame(orbLoop);
 $("loginbtn").onclick = async () => {
   $("loginerr").textContent = "";
   try {
@@ -556,25 +1006,44 @@ $("loginbtn").onclick = async () => {
       const cfg = await (await fetch("/api/config?include_defaults=false",
         { credentials: "include" })).json();
       const p = ((cfg.display || {}).personality || "").toLowerCase();
-      S.soul = (p === "ultron") ? "ultron" : "jarvis";
+      S.soul = (p === "ultron") ? "ultron" : (p === "friday") ? "friday" : "jarvis";
     } catch (e) { /* soul defaults to jarvis */ }
+    document.body.dataset.soul = S.soul;
+    $("soulbadge").textContent = "soul: " + (SOUL_TITLE[S.soul] || "Jarvis").toLowerCase() +
+      " — voice server-side per soul · " + say("hello");
+    setOrb("idle"); // soul palette flips instantly on the same orb
+    setInfo();
+    updateMemoryLine("");
+    $("statusline").textContent = say("hello") + " ears + mouth only — the brain stays server-side.";
+    try {
+      const verb = $("verbbtn");
+      verb.textContent = "💬 Voice orders: " + S.verbosity;
+      $("verbwhy").textContent = VERB_WHY[S.verbosity];
+    } catch (e) { /* orders labels are decorative */ }
     const okMic = micSupported();
     $("ptt").disabled = !okMic;
     $("tog").disabled = !okMic;
+    $("kill").disabled = false; // one-tap kill, always visible
     if (!okMic) {
-      $("micnote").textContent = "No microphone API in this browser — type below, it talks back all the same.";
+      $("micnote").textContent = say("nomic");
     } else {
-      $("micnote").textContent = "Mic ready. Hold the button, or tap Start/Stop.";
+      $("micnote").textContent = say("ready");
+    }
+    await heartbeat(); // first honest pulse reading
+    if (!S.heartTimer) {
+      S.heartTimer = setInterval(() => { heartbeat(); }, 30000);
     }
   } catch (e) {
-    $("loginerr").textContent = "Login failed: " + String((e && e.message) || e).slice(0, 100);
+    $("loginerr").textContent = say("loginfail") + " " + String((e && e.message) || e).slice(0, 100);
   }
 };
 $("ptt").addEventListener("pointerdown", async (e) => {
   e.preventDefault();
   if (S.streaming && S.audio) { stopPlayback("barge"); await interruptTurn(); }
   try { await startRec(); } catch (err) {
-    note("mic blocked: " + String((err && err.message) || err).slice(0, 80));
+    S.orb.frozen = true; // rings freeze on mic error — never fake listening
+    setState("IDLE");
+    note(say("micblocked") + " " + String((err && err.message) || err).slice(0, 80));
   }
 });
 $("ptt").addEventListener("pointerup", () => { if (S.recording) stopRec(); });
@@ -584,7 +1053,9 @@ $("tog").onclick = async () => {
   S.manualStop = false;
   if (S.streaming && S.audio) { stopPlayback("barge"); await interruptTurn(); }
   try { await startRec(); } catch (err) {
-    note("mic blocked: " + String((err && err.message) || err).slice(0, 80));
+    S.orb.frozen = true; // rings freeze on mic error — never fake listening
+    setState("IDLE");
+    note(say("micblocked") + " " + String((err && err.message) || err).slice(0, 80));
   }
 };
 $("send").onclick = () => {
@@ -596,10 +1067,16 @@ $("textbox").addEventListener("keydown", (e) => {
   if (e.key === "Enter") { e.preventDefault(); $("send").click(); }
 });
 $("kill").onclick = async () => {
+  // One-tap reactor shutdown: real interrupt + synchronous audio pause,
+  // ember orb + STOPPED banner, latched until the next real work.
   stopPlayback("killed");
   const ok = await interruptTurn();
-  if (cur) await finishTurn(ok ? "stopped by you" : "stop failed");
-  else note("nothing running");
+  S.stopped = true;
+  S.manualStop = true;
+  setOrb("stopped");
+  note(say("killednote"));
+  if (cur) await finishTurn(ok ? say("stopped") : "stop failed");
+  else setState("IDLE"); // stopped latch keeps the ember visuals
 };
 $("speakbtn").onclick = () => {
   S.speak = !S.speak;
@@ -611,7 +1088,7 @@ $("contbtn").onclick = async () => {
   $("contbtn").textContent = S.cont ? "🔁 Continuous: on" : "🔁 Continuous: off";
   if (S.cont && !S.recording && !S.streaming) {
     if (!micSupported()) {
-      note("No microphone API — continuous needs a mic; text still works.");
+      note(say("nomichands"));
       S.cont = false;
       $("contbtn").textContent = "🔁 Continuous: off";
       return;
@@ -620,18 +1097,20 @@ $("contbtn").onclick = async () => {
     try { await startRec(); } catch (err) {
       S.cont = false;
       $("contbtn").textContent = "🔁 Continuous: off";
+      S.orb.frozen = true; // rings freeze on mic error — never fake listening
       setState("IDLE");
-      note("mic blocked: " + String((err && err.message) || err).slice(0, 80));
+      note(say("micblocked") + " " + String((err && err.message) || err).slice(0, 80));
     }
   } else if (!S.cont) {
     setState("IDLE");
-    note("hands-free off.");
+    note(say("handsfree"));
   }
 };
 $("verbbtn").onclick = () => {
   const i = (VERBOSITIES.indexOf(S.verbosity) + 1) % VERBOSITIES.length;
   S.verbosity = VERBOSITIES[i];
-  $("verbbtn").textContent = "💬 Verbose: " + S.verbosity;
+  $("verbbtn").textContent = "💬 Voice orders: " + S.verbosity;
+  $("verbwhy").textContent = VERB_WHY[S.verbosity];
 };
 </script>
 </body>
