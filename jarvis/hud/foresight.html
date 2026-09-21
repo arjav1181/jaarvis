@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Foresight engine — Jarvis</title>
+<style>
+  :root { color-scheme: dark; }
+  body { background: #101418; color: #E8F4FF; font-family: system-ui, sans-serif;
+         margin: 0; padding: 16px; max-width: 720px; }
+  h1 { color: #9ADCFF; font-size: 1.3rem; margin: 0 0 4px; }
+  .sub { color: #5B7A90; font-size: 0.85rem; margin-bottom: 12px; }
+  section { border: 1px solid #2E4A5E; border-radius: 8px; padding: 10px 12px;
+            margin: 10px 0; }
+  section h2 { color: #7FD0FF; font-size: 1rem; margin: 0 0 6px; }
+  .ok { color: #8FBC8F; } .bad { color: #ef5350; } .dim { color: #7A8A99; }
+  a { color: #7FD0FF; }
+</style>
+</head>
+<body>
+<h1>◈ Foresight engine</h1>
+<div class="sub" id="snapline">reading the last foresight snapshot…</div>
+<section><h2>Calibration</h2><div id="cal"></div></section>
+<section><h2>Open predictions</h2><div id="open"></div></section>
+<section><h2>Due resolutions</h2><div id="due"></div></section>
+<section><h2>Recent runs</h2><div id="runs"></div></section>
+<div class="sub"><a href="./voice.html">← back to the voice page</a> ·
+<a href="./diag.html">suit diagnostics</a> · <a href="./apex.html">apex beast</a></div>
+<script>
+(function () {
+  "use strict";
+  function el(id) { return document.getElementById(id); }
+  function line(parent, text, cls) {
+    var d = document.createElement("div");
+    if (cls) d.className = cls;
+    d.textContent = text;
+    parent.appendChild(d);
+  }
+  fetch("./foresight-snapshot.json", { credentials: "include" }).then(function (r) {
+    if (!r.ok) throw new Error("http " + r.status);
+    return r.json();
+  }).then(function (snap) {
+    el("snapline").textContent = "snapshot " + snap.built_at + ", sir.";
+    var c = el("cal"), cal = snap.calibration;
+    line(c, snap.headline + ".", cal.scored ? "ok" : "dim");
+    if (cal.scored) {
+      line(c, "Brier " + cal.brier + " over " + cal.resolved + " resolved, sir.", "dim");
+      cal.buckets.forEach(function (b) {
+        if (b.n > 0) line(c, "  @" + b.lo + "–" + b.hi + ": " + b.hits + "/" + b.n + ", sir.", "dim");
+      });
+    }
+    var o = el("open"), lg = snap.ledger;
+    line(o, lg.open + " open, " + lg.resolved + " resolved, sir.", lg.open ? "ok" : "dim");
+    var d = el("due");
+    if (snap.overdue.length === 0) {
+      line(d, "Nothing overdue, sir.", "ok");
+    } else {
+      snap.overdue.forEach(function (e) {
+        line(d, e.id + ": " + e.question + " (due " + e.horizon + "), sir.", "bad");
+      });
+    }
+    var r = el("runs");
+    if (snap.recent_runs.length === 0) {
+      line(r, "No suite runs yet, sir.", "dim");
+    } else {
+      snap.recent_runs.forEach(function (x) {
+        line(r, x.suite + " at " + x.at + ": " + x.computed_ok + "/" + x.computed +
+                " computed ok, " + x.recorded + " filed, " + x.delegated + " delegated (plan only), sir.", "dim");
+      });
+    }
+    var ex = snap.example_suite;
+    line(r, "Example suite " + (ex.present ? (ex.valid ? "valid" : "INVALID") : "missing") + ", sir.", ex.valid ? "dim" : "bad");
+  }).catch(function () {
+    el("snapline").textContent =
+      "No foresight snapshot, sir — log in at the voice page first, then let the foresight job run.";
+  });
+})();
+</script>
+</body>
+</html>

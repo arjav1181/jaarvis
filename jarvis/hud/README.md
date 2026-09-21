@@ -163,3 +163,20 @@ it would break single-port forwarding and need its own auth story.
   frontier aggregator, privacy full; plan only, execution stays in-agent),
   `jarvis-langfuse` (consent record, never activates), `jarvis-achieve`
   (computed badges over `jarvis/apex/events.jsonl`).
+
+## W10 — foresight engine page
+
+- **Foresight page** (`foresight.html`, new file, same auth gate): renders
+  `<home>/web_dist_overlay/foresight-snapshot.json` — calibration headline
+  ("right 8/10" + Brier, or honest unscored), ledger open/resolved counts,
+  overdue resolutions, recent suite runs, example-suite validity. Written
+  nightly at 21:30 by the `jarvis-foresight-brief` job
+  (`jarvis/bin/jarvis-doctor-foresight`, installed by
+  `jarvis/foresight/ensure-foresight.sh` — touches no earlier job).
+- Engine (all new, all local, zero tokens): `jarvis-foresee record/resolve/
+  list/calibrate/run-suite/brief`. Predictions are authored claims filed to
+  an append-only ledger (`predictions.jsonl`); resolutions file verdicts,
+  never rewrites. Compute scenarios run under an AST whitelist (arithmetic
+  only — no calls/attrs/imports). Delegate scenarios fold into one
+  `delegate_task`-compatible tasks-batch payload (upstream gate mirrored
+  from `tools/delegate_tool_tasks.py`); plan-only, execution stays in-agent.
