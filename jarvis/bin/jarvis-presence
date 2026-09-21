@@ -1,0 +1,119 @@
+#!/usr/bin/env python3
+"""jarvis-presence — W9 presence CLI (JSON out). status | intercom | outbox | ack | deploy."""
+import argparse
+import json
+import shutil
+import sys
+from pathlib import Path
+
+REPO = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(REPO))
+
+from jarvis.presence import intercom as _parse
+from jarvis.presence import store as _store
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    sub = ap.add_subparsers(dest="cmd", required=True)
+
+    sub.add_parser("status")
+
+    i = sub.add_parser("intercom")
+    i.add_argument("text", nargs="?")
+    i.add_argument("--room", default="")
+    i.add_argument("--to", default="")
+    i.add_argument("--all", action="store_true")
+    i.add_argument("--from", dest="frm", default="operator")
+    i.add_argument("--parse", action="store_true",
+                   help="parse 'tell the kitchen …' style intent for target+body")
+
+    o = sub.add_parser("outbox")
+    o.add_argument("--satellite", required=True)
+
+    a = sub.add_parser("ack")
+    a.add_argument("--satellite", required=True)
+    a.add_argument("ids", nargs="+")
+
+    d = sub.add_parser("deploy")
+    d.add_argument("--home", required=True,
+                   help="explicit rig HERMES_HOME to deploy into (never implicit)")
+
+    r = sub.add_parser("register")
+    r.add_argument("--satellite", required=True)
+    r.add_argument("--room", required=True)
+    r.add_argument("--device", default="cli")
+    r.add_argument("--no-mic", action="store_true")
+    r.add_argument("--no-speaker", action="store_true")
+
+    h = sub.add_parser("heartbeat")
+    h.add_argument("--satellite", required=True)
+    h.add_argument("--listening", action="store_true")
+
+    args = ap.parse_args()
+    if args.cmd == "status":
+        res = _store.status()
+    elif args.cmd == "intercom":
+        text, room, to, all_ = args.text or "", args.room, args.to, args.all
+        if args.parse and text:
+            p = _parse.parse(text)
+            if p["kind"] == "room":
+                room, text = p["room"], p["body"]
+            elif p["kind"] == "all":
+                all_, text = True, p["body"]
+        kw = {"text": text, "frm": args.frm}
+        if all_:
+            kw["to_all"] = True
+        elif to:
+            kw["to_satellite"] = to
+        elif room:
+            kw["to_room"] = room
+        else:
+            kw["to_room"] = None  # → no_target, honest
+        res = _store.intercom(**kw)
+    elif args.cmd == "outbox":
+        res = _store.outbox(satellite_id=args.satellite)
+    elif args.cmd == "ack":
+        res = _store.ack(satellite_id=args.satellite,
+                         ids=[int(x) for x in args.ids])
+    elif args.cmd == "register":
+        res = _store.register(satellite_id=args.satellite, room=args.room,
+                              device=args.device,
+                              caps={"mic": not args.no_mic,
+                                    "speaker": not args.no_speaker})
+    elif args.cmd == "heartbeat":
+        res = _store.heartbeat(satellite_id=args.satellite,
+                               listening=args.listening)
+    elif args.cmd == "deploy":
+        res = deploy(args.home)
+    print(json.dumps(res, indent=1))
+    return 0 if res.get("ok") else 1
+
+
+def deploy(home):
+    """Copy plugin + satellite page into an explicit rig home (no repo writes)."""
+    h = Path(home)
+    plug = h / "plugins" / "presence" / "dashboard"
+    plug.mkdir(parents=True, exist_ok=True)
+    copied = []
+    for src in ((REPO / "jarvis" / "plugins" / "presence" / "dashboard"
+                 / "manifest.json"),
+                (REPO / "jarvis" / "plugins" / "presence" / "dashboard"
+                 / "api.py"),
+                (REPO / "jarvis" / "presence" / "store.py")):
+        dst = plug / src.name
+        shutil.copy2(src, dst)
+        copied.append(str(dst))
+    page_src = REPO / "jarvis" / "hud" / "presence.html"
+    page_dst = h / "web_dist_overlay" / "presence.html"
+    page_dst.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(page_src, page_dst)
+    copied.append(str(page_dst))
+    return {"ok": True, "copied": copied,
+            "next": ["hermes plugins enable presence (HERMES_HOME=%s)" % home,
+                     "restart the dashboard so the plugin API mounts",
+                     "open /presence.html?room=<room> in two tabs as two rooms"]}
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
