@@ -1,0 +1,57 @@
+#!/usr/bin/env python3
+"""jarvis-watchdog-alert — speak-worthy CI changes only (W8 proactivity).
+
+Reads the ci-watchdog fingerprint (same script the W5 job monitors),
+diffs against <home>/jarvis/last-fingerprint.txt, and speaks the alert
+text via jarvis-speak when something changed. No change -> one quiet line.
+"""
+import subprocess
+import sys
+from pathlib import Path
+
+REPO = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(REPO / "jarvis" / "proactivity"))
+sys.path.insert(0, str(REPO / "jarvis" / "permissions"))
+sys.path.insert(0, str(REPO))
+
+import alerts as pro_alerts
+
+
+def _home() -> Path:
+    import os
+    return Path(os.environ.get("HERMES_HOME") or os.path.expanduser("~/.jarvis"))
+
+
+def main() -> int:
+    home = _home()
+    state = home / "jarvis" / "last-fingerprint.txt"
+    try:
+        proc = subprocess.run(
+            # `sh` explicitly: the fingerprint script ships non-executable (W5).
+            ["sh", str(REPO / "jarvis" / "habits" / "scripts" / "ci-fingerprint.sh")],
+            capture_output=True, text=True, timeout=120,
+            cwd=str(REPO))
+        current = [ln.strip() for ln in proc.stdout.splitlines() if ln.strip()]
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        print(f"fingerprint unavailable: {exc}")
+        return 0
+    previous = []
+    if state.exists():
+        try:
+            previous = [ln.strip() for ln in state.read_text().splitlines() if ln.strip()]
+        except OSError:
+            previous = []
+    text = pro_alerts.build(previous, current)
+    state.parent.mkdir(parents=True, exist_ok=True)
+    state.write_text("\n".join(current) + ("\n" if current else ""))
+    if not text:
+        print("watchdog quiet — nothing changed.")
+        return 0
+    speak = subprocess.run([str(REPO / "jarvis" / "bin" / "jarvis-speak"), "--alert", text],
+                           capture_output=True, text=True, timeout=300)
+    print(speak.stdout.strip() or "(speaker silent)")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

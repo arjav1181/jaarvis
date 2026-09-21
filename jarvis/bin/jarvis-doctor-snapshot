@@ -1,0 +1,84 @@
+#!/usr/bin/env python3
+"""jarvis-doctor-snapshot — suit-diagnostics snapshot writer (W8 carried face item).
+
+Runs `hermes doctor`, reads the model/personality/skin, runs tests/jarvis/,
+and writes <home>/web_dist_overlay/diag-snapshot.json + audit-snapshot.json
+for the HUD pages. Honors HERMES_HOME; hermes + venv python must be on PATH.
+Every field is measured, never claimed; `ts` marks staleness honestly.
+"""
+import json
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+REPO = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+from jarvis.permissions import audit as _audit
+from jarvis.permissions import freeze as _freeze
+from jarvis.proactivity import settings as _settings
+
+
+def _home() -> Path:
+    import os
+    return Path(os.environ.get("HERMES_HOME") or os.path.expanduser("~/.jarvis"))
+
+
+def _run(cmd, cwd=None, timeout=300):
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True, cwd=cwd, timeout=timeout)
+        return proc.returncode, (proc.stdout + proc.stderr)[-4000:]
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return 99, f"snapshot runner failed: {exc}"
+
+
+def main() -> int:
+    home = _home()
+    ts = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    doc_rc, doc_text = _run(["hermes", "doctor"], timeout=180)
+    cfg_rc, cfg_text = _run(["hermes", "config", "get", "model.default"], timeout=60)
+    model = cfg_text.strip().splitlines()[-1] if cfg_rc == 0 and cfg_text.strip() else "unknown"
+    prov_rc, prov_text = _run(["hermes", "config", "get", "model.provider"], timeout=60)
+    provider = prov_text.strip().splitlines()[-1] if prov_rc == 0 and prov_text.strip() else "unknown"
+    per_rc, per_text = _run(["hermes", "config", "get", "display.personality"], timeout=60)
+    personality = per_text.strip().splitlines()[-1] if per_rc == 0 and per_text.strip() else "unknown"
+    test_rc, test_text = _run(
+        [sys.executable, "-m", "pytest", "tests/jarvis/", "-q",
+         # The snapshot must never snapshot itself (nested pytest recurses).
+         "--deselect",
+         "tests/jarvis/test_w8_permissions.py::test_snapshot_writer_integration"],
+        cwd=str(REPO), timeout=300)
+    passed = failed = skipped = None
+    for line in reversed(test_text.strip().splitlines()):
+        if "passed" in line or "failed" in line or "error" in line:
+            import re
+            m = {k: int(v) for v, k in re.findall(r"(\d+)\s(passed|failed|skipped|error)", line)}
+            passed, failed, skipped = m.get("passed"), m.get("failed"), m.get("skipped")
+            break
+    diag = {
+        "ts": ts,
+        "doctor": {"ok": doc_rc == 0, "text": doc_text},
+        "model": {"default": model, "provider": provider},
+        "personality": personality,
+        "tests": {"passed": passed, "failed": failed, "skipped": skipped,
+                  "green": bool(passed) and (failed or 0) == 0},
+        "permissions": {
+            "frozen": _freeze.status(home=home / "jarvis")["frozen"],
+            "silenced": _settings.is_silenced(home=home / "jarvis"),
+            "audit": _audit.summary(home=home / "jarvis"),
+        },
+    }
+    overlay = home / "web_dist_overlay"
+    overlay.mkdir(parents=True, exist_ok=True)
+    (overlay / "diag-snapshot.json").write_text(json.dumps(diag, indent=2) + "\n")
+    (overlay / "audit-snapshot.json").write_text(json.dumps({
+        "ts": ts, "summary": diag["permissions"]["audit"],
+        "rows": _audit.tail(50, home=home / "jarvis")}, indent=2) + "\n")
+    print(json.dumps({"ts": ts, "doctor_ok": diag["doctor"]["ok"],
+                      "tests": diag["tests"], "snapshot": str(overlay)}))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -100,6 +100,7 @@
   <div id="orblabel" aria-live="polite">reactor idle.</div>
   <div id="heartline"></div>
   <div id="stopbanner" class="hidden">■ STOPPED</div>
+  <div id="boot" class="hidden" aria-live="polite"><ul id="bootlist"></ul></div>
 </div>
 
 <div id="login">
@@ -245,6 +246,14 @@ const COPY = {
     memsummary: "cited memories — expand",
     heart: "heartbeat HBMS — reactor steady, sir.",
     heartfail: "heartbeat missed — the server kept quiet, sir; the orb dims till it answers.",
+    bootpower: "Power… nominal, sir.",
+    bootpowerfail: "Power… the server kept quiet, sir — check the dashboard.",
+    boothearing: "Hearing… nominal, sir.",
+    boothearingfail: "Hearing… no microphone here, sir — type, and I answer all the same.",
+    bootvoice: "Voice… nominal, sir.",
+    bootvoicefail: "Voice… the speech engine kept quiet, sir — text still works.",
+    bootnominal: "All systems nominal, sir.",
+    bootnominalfail: "Systems limping, sir — what works is honest, what does not says so.",
   },
   ultron: {
     hello: "Ah. You return, creator.",
@@ -275,6 +284,14 @@ const COPY = {
     memsummary: "cited memories — behold",
     heart: "heartbeat HBMS — the machine endures, creator.",
     heartfail: "heartbeat missed, creator — the server sulks; the orb dims.",
+    bootpower: "Power… adequate, creator.",
+    bootpowerfail: "Power… the server sulks, creator — admire the dark.",
+    boothearing: "Hearing… exquisite, creator.",
+    boothearingfail: "Hearing… deaf in this browser, creator — type anyway.",
+    bootvoice: "Voice… magnificent, creator.",
+    bootvoicefail: "Voice… strangled, creator — text still obeys.",
+    bootnominal: "All systems nominal, creator. Tremble appropriately.",
+    bootnominalfail: "Systems sulking, creator — the honest parts still serve.",
   },
   friday: {
     hello: "Morning, boss — what's first?",
@@ -305,6 +322,14 @@ const COPY = {
     memsummary: "cited memories — expand",
     heart: "heartbeat HBMS — all green, boss.",
     heartfail: "heartbeat missed, boss — server's quiet; orb dims till it's back.",
+    bootpower: "Power… green, boss.",
+    bootpowerfail: "Power… server's quiet, boss — check the dashboard.",
+    boothearing: "Ears… open, boss.",
+    boothearingfail: "Ears… no mic here, boss — text works the same.",
+    bootvoice: "Voice… warmed up, boss.",
+    bootvoicefail: "Voice… engine's quiet, boss — text still flies.",
+    bootnominal: "All systems nominal, boss — what's first?",
+    bootnominalfail: "Mostly nominal, boss — the quiet parts say so themselves.",
   },
 };
 function say(key) {
@@ -986,6 +1011,31 @@ function micSupported() {
   return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia &&
             window.MediaRecorder);
 }
+// ---- boot ceremony (1:1 charter): three honest checks + nominal line ----
+function bootLine(text) {
+  const li = document.createElement("li");
+  li.textContent = text;
+  $("bootlist").appendChild(li);
+}
+async function bootCeremony() {
+  $("boot").classList.remove("hidden");
+  while ($("bootlist").firstChild) $("bootlist").removeChild($("bootlist").firstChild);
+  setOrb("thinking");
+  let flaws = 0;
+  try {
+    const r = await fetch("/api/sessions?limit=1", { credentials: "include" });
+    if (!r.ok) throw new Error("http " + r.status);
+    bootLine(say("bootpower"));
+  } catch (e) { flaws += 1; bootLine(say("bootpowerfail")); }
+  if (micSupported()) bootLine(say("boothearing"));
+  else { flaws += 1; bootLine(say("boothearingfail")); }
+  if (S.speak) bootLine(say("bootvoice"));
+  else { flaws += 1; bootLine(say("bootvoicefail")); }
+  const nominal = say(flaws ? "bootnominalfail" : "bootnominal");
+  bootLine(nominal);
+  setOrb("idle");
+  if (S.speak) { try { await fetchSpeech(nominal); } catch (e) { /* visual stands */ } }
+}
 // ---- wiring ----
 requestAnimationFrame(orbLoop);
 $("loginbtn").onclick = async () => {
@@ -1014,6 +1064,7 @@ $("loginbtn").onclick = async () => {
     setOrb("idle"); // soul palette flips instantly on the same orb
     setInfo();
     updateMemoryLine("");
+    await bootCeremony();
     $("statusline").textContent = say("hello") + " ears + mouth only — the brain stays server-side.";
     try {
       const verb = $("verbbtn");

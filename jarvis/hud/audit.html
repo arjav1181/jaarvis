@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Audit ledger — Jarvis</title>
+<style>
+  :root { color-scheme: dark; }
+  body { background: #14100a; color: #FFF8DC; font-family: system-ui, sans-serif;
+         margin: 0; padding: 16px; max-width: 860px; }
+  h1 { color: #FFE9A3; font-size: 1.3rem; margin: 0 0 4px; }
+  .sub { color: #B8860B; font-size: 0.85rem; margin-bottom: 12px; }
+  .filters button { background: #1a1408; color: #FFD700; border: 1px solid #8B6914;
+    border-radius: 6px; padding: 8px 12px; margin: 2px; font-size: 0.9rem; }
+  .filters button[aria-pressed="true"] { background: #8B6914; color: #FFF8DC; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.82rem; margin-top: 8px; }
+  th, td { border: 1px solid #8B6914; padding: 6px 8px; text-align: left;
+    vertical-align: top; }
+  th { color: #FFD700; }
+  .allowed { color: #8FBC8F; } .denied { color: #ef5350; } .enforced { color: #FBBF24; }
+  a { color: #FFD700; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<h1>◆ Audit ledger</h1>
+<div class="sub" id="snapline">reading the ledger snapshot…</div>
+<div class="sub" id="summary"></div>
+<div class="filters" role="group" aria-label="filter by decision">
+  <button data-f="all" aria-pressed="true">all</button>
+  <button data-f="allowed" aria-pressed="false">allowed</button>
+  <button data-f="denied" aria-pressed="false">denied</button>
+  <button data-f="enforced" aria-pressed="false">enforced</button>
+</div>
+<table><thead><tr><th>time</th><th>actor</th><th>action</th><th>decision</th><th>detail</th></tr></thead>
+<tbody id="rows"></tbody></table>
+<div class="sub"><a href="./voice.html">← back to the voice page</a> ·
+<a href="./diag.html">suit diagnostics</a></div>
+<script>
+(function () {
+  "use strict";
+  var rows = [];
+  function el(id) { return document.getElementById(id); }
+  function render(filter) {
+    var body = el("rows");
+    while (body.firstChild) body.removeChild(body.firstChild);
+    var shown = 0;
+    rows.forEach(function (r) {
+      if (filter !== "all" && r.decision !== filter) return;
+      shown += 1;
+      var tr = document.createElement("tr");
+      ["ts", "actor", "action", "decision", "detail"].forEach(function (k) {
+        var td = document.createElement("td");
+        td.textContent = r[k] == null ? "" : String(r[k]);
+        if (k === "decision") td.className = String(r[k]);
+        tr.appendChild(td);
+      });
+      body.appendChild(tr);
+    });
+    el("summary").textContent = "Showing " + shown + " of " + rows.length +
+      " entries, sir — append-only, nothing here can be unsaid.";
+  }
+  var btns = document.querySelectorAll(".filters button");
+  btns.forEach(function (b) {
+    b.addEventListener("click", function () {
+      btns.forEach(function (x) { x.setAttribute("aria-pressed", "false"); });
+      b.setAttribute("aria-pressed", "true");
+      render(b.getAttribute("data-f"));
+    });
+  });
+  fetch("./audit-snapshot.json", { credentials: "include" }).then(function (r) {
+    if (!r.ok) throw new Error("http " + r.status);
+    return r.json();
+  }).then(function (snap) {
+    rows = snap.rows || [];
+    var s = snap.summary || {};
+    el("snapline").textContent = "snapshot " + snap.ts + ": " + (s.allowed || 0) +
+      " allowed, " + (s.denied || 0) + " denied, " + (s.enforced || 0) + " enforced, sir.";
+    render("all");
+  }).catch(function () {
+    el("snapline").textContent =
+      "No ledger snapshot, sir — log in at the voice page first, then let the snapshot job run.";
+  });
+})();
+</script>
+</body>
+</html>

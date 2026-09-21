@@ -123,3 +123,25 @@ it would break single-port forwarding and need its own auth story.
   thumb-zone under 480 px, 360 px-first, system fonts, zero external requests
   (asserted: no http/links/images/url()/imports), `aria-live` thread + orb
   label, ≥48 px targets.
+
+## W8 — carried face items (suit diagnostics + boot ceremony) + audit page
+
+- **Boot ceremony** (in `voice.html`, post-login): three honest checks —
+  power (live `/api/sessions?limit=1` heartbeat), hearing (`micSupported()`
+  probe), voice (`S.speak` switch state) — then the per-soul nominal line,
+  spoken when speak is on. Every line reports its own outcome; a failed check
+  says so in the soul's voice. Speech-only: the ceremony never submits,
+  never approves (asserted in `test_w8_permissions.py`).
+- **Suit-diagnostics page** (`diag.html`, same-origin + auth gate like the
+  voice page): renders `<home>/web_dist_overlay/diag-snapshot.json` —
+  `hermes doctor` ok/text, model + provider + personality, `tests/jarvis/`
+  passed/failed/green, frozen/silenced/audit counts — with an explicit stale
+  warning past 45 min. The snapshot is written every 30 min by the
+  `jarvis-snapshot` cron job (`jarvis/bin/jarvis-doctor-snapshot`); every
+  field is measured at snapshot time, never claimed.
+- **Audit-ledger page** (`audit.html`): renders `audit-snapshot.json`
+  (newest-50 rows + counts) with all/allowed/denied/enforced filters.
+- Deploy: copy `diag.html` + `audit.html` next to `voice.html` in
+  `<home>/web_dist_overlay` (same serving choice as W3 — no new auth story).
+  Pages fetch only their own `./*.json` snapshot (asserted: single fetch,
+  zero external, text-only rendering).

@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Suit diagnostics — Jarvis</title>
+<style>
+  :root { color-scheme: dark; }
+  body { background: #14100a; color: #FFF8DC; font-family: system-ui, sans-serif;
+         margin: 0; padding: 16px; max-width: 720px; }
+  h1 { color: #FFE9A3; font-size: 1.3rem; margin: 0 0 4px; }
+  .sub { color: #B8860B; font-size: 0.85rem; margin-bottom: 12px; }
+  section { border: 1px solid #8B6914; border-radius: 8px; padding: 10px 12px;
+            margin: 10px 0; }
+  section h2 { color: #FFD700; font-size: 1rem; margin: 0 0 6px; }
+  .ok { color: #8FBC8F; } .bad { color: #ef5350; } .dim { color: #8A7A4A; }
+  pre { white-space: pre-wrap; font-size: 0.8rem; color: #E8DCC0; }
+  a { color: #FFD700; }
+  #stale { color: #FBBF24; font-weight: bold; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<h1>◆ Suit diagnostics</h1>
+<div class="sub" id="snapline">reading the last snapshot…</div>
+<div class="sub hidden" id="stale"></div>
+<section><h2>Power — doctor</h2><div id="doctor"></div><pre id="doctext"></pre></section>
+<section><h2>Mind — model</h2><div id="model"></div></section>
+<section><h2>Body — tests</h2><div id="tests"></div></section>
+<section><h2>Guard — permissions</h2><div id="guard"></div></section>
+<div class="sub"><a href="./voice.html">← back to the voice page</a></div>
+<script>
+(function () {
+  "use strict";
+  function el(id) { return document.getElementById(id); }
+  function line(parent, text, cls) {
+    var d = document.createElement("div");
+    if (cls) d.className = cls;
+    d.textContent = text;
+    parent.appendChild(d);
+  }
+  fetch("./diag-snapshot.json", { credentials: "include" }).then(function (r) {
+    if (!r.ok) throw new Error("http " + r.status);
+    return r.json();
+  }).then(function (snap) {
+    var ageMin = Math.round((Date.now() - Date.parse(snap.ts)) / 60000);
+    el("snapline").textContent = "snapshot " + snap.ts + " (" + ageMin + " min old, sir).";
+    if (ageMin > 45) {
+      el("stale").textContent = "Stale, sir — the snapshot job may be down; treat every line as last-known.";
+      el("stale").classList.remove("hidden");
+    }
+    var doc = el("doctor");
+    line(doc, snap.doctor.ok ? "Nominal, sir — doctor is clean."
+                             : "Doctor reports issues, sir — read below.",
+         snap.doctor.ok ? "ok" : "bad");
+    el("doctext").textContent = snap.doctor.text || "";
+    var mind = el("model");
+    line(mind, "Model: " + snap.model.default + " via " + snap.model.provider + ", sir.");
+    line(mind, "Soul on deck: " + snap.personality + ", sir.");
+    var body = el("tests");
+    var t = snap.tests;
+    line(body, "tests/jarvis: " + t.passed + " passed, " + t.failed + " failed, " +
+         t.skipped + " skipped, sir.", t.green ? "ok" : "bad");
+    if (!t.green) line(body, "Red, sir — do not trust the suit till it is green.", "bad");
+    var guard = el("guard");
+    var p = snap.permissions;
+    line(guard, p.frozen ? "FROZEN, sir — L1/L2 denied till thaw."
+                         : "Unfrozen, sir — approvals flow normally.",
+         p.frozen ? "bad" : "ok");
+    line(guard, p.silenced ? "Silent, sir — proactivity muted (House Party or owner order)."
+                           : "Voiceful, sir — briefs and alerts speak.");
+    line(guard, "Ledger: " + p.audit.allowed + " allowed, " + p.audit.denied +
+         " denied, " + p.audit.enforced + " enforced, sir.", "dim");
+  }).catch(function () {
+    el("snapline").textContent =
+      "No snapshot, sir — log in at the voice page first, then let the snapshot job run.";
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+{
+  "name": "jarvis-snapshot",
+  "schedule": "*/30 * * * *",
+  "prompt": "Run the suit-diagnostics snapshot: `HERMES_HOME=/home/runner/.jarvis-test PATH=/home/runner/.venvs/jarvis-w0/bin:$PATH jarvis/bin/jarvis-doctor-snapshot` from /home/runner/workspace/hermes-fork. Report one line (doctor ok/issues, tests passed/failed, snapshot written). If the snapshot runner itself fails, say so in one line and stop. Never send, post, or merge anything.",
+  "skills": [],
+  "model": "auto/best-reasoning",
+  "provider": "custom",
+  "continuity": false,
+  "deliver": "local",
+  "failure_deliver": "local",
+  "workdir": "/home/runner/workspace/hermes-fork",
+  "monitor_script": null
+}

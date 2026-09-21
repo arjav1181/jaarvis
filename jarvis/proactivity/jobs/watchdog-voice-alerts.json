@@ -1,0 +1,13 @@
+{
+  "name": "watchdog-voice-alerts",
+  "schedule": "5,35 * * * *",
+  "prompt": "Check for speak-worthy CI changes: `HERMES_HOME=/home/runner/.jarvis-test PATH=/home/runner/.venvs/jarvis-w0/bin:$PATH jarvis/bin/jarvis-watchdog-alert` from /home/runner/workspace/hermes-fork. Report one line (alert spoken, or quiet). Never send, post, or merge anything.",
+  "skills": [],
+  "model": "auto/best-reasoning",
+  "provider": "custom",
+  "continuity": false,
+  "deliver": "local",
+  "failure_deliver": "local",
+  "workdir": "/home/runner/workspace/hermes-fork",
+  "monitor_script": null
+}

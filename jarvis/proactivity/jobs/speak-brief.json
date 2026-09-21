@@ -1,0 +1,13 @@
+{
+  "name": "speak-brief",
+  "schedule": "5 7 * * *",
+  "prompt": "Speak the morning brief unless the house is silent: `HERMES_HOME=/home/runner/.jarvis-test PATH=/home/runner/.venvs/jarvis-w0/bin:$PATH jarvis/bin/jarvis-speak --brief` from /home/runner/workspace/hermes-fork. Report one line (SPOKEN path+bytes, or SILENCED). Never send, post, or merge anything.",
+  "skills": [],
+  "model": "auto/best-reasoning",
+  "provider": "custom",
+  "continuity": false,
+  "deliver": "local",
+  "failure_deliver": "local",
+  "workdir": "/home/runner/workspace/hermes-fork",
+  "monitor_script": null
+}
