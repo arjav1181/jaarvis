@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hands everywhere — Jarvis</title>
+<style>
+  :root { color-scheme: dark; }
+  body { background: #101418; color: #E8F4FF; font-family: system-ui, sans-serif;
+         margin: 0; padding: 16px; max-width: 720px; }
+  h1 { color: #9ADCFF; font-size: 1.3rem; margin: 0 0 4px; }
+  .sub { color: #5B7A90; font-size: 0.85rem; margin-bottom: 12px; }
+  section { border: 1px solid #2E4A5E; border-radius: 8px; padding: 10px 12px;
+            margin: 10px 0; }
+  section h2 { color: #7FD0FF; font-size: 1rem; margin: 0 0 6px; }
+  .ok { color: #8FBC8F; } .bad { color: #ef5350; } .dim { color: #7A8A99; }
+  a { color: #7FD0FF; }
+</style>
+</head>
+<body>
+<h1>✋ Hands everywhere</h1>
+<div class="sub" id="snapline">reading the last hands snapshot…</div>
+<section><h2>Desktop — computer-use</h2><div id="comp"></div></section>
+<section><h2>SSH fleet</h2><div id="fleet"></div></section>
+<section><h2>Telegram remote</h2><div id="tg"></div></section>
+<section><h2>Car / home</h2><div id="car"></div></section>
+<section><h2>Kill path</h2><div id="kill"></div></section>
+<div class="sub"><a href="./voice.html">← back to the voice page</a> ·
+<a href="./diag.html">suit diagnostics</a> · <a href="./apex.html">apex beast</a></div>
+<script>
+(function () {
+  "use strict";
+  function el(id) { return document.getElementById(id); }
+  function line(parent, text, cls) {
+    var d = document.createElement("div");
+    if (cls) d.className = cls;
+    d.textContent = text;
+    parent.appendChild(d);
+  }
+  fetch("./hands-snapshot.json", { credentials: "include" }).then(function (r) {
+    if (!r.ok) throw new Error("http " + r.status);
+    return r.json();
+  }).then(function (snap) {
+    el("snapline").textContent = "snapshot " + snap.built_at + ", sir.";
+    var c = el("comp");
+    line(c, snap.computer.enabled ? "Enabled (" + snap.computer.manifest + "), sir."
+          : "Off by default, sir — manifests only, YOLO refused.",
+          snap.computer.enabled ? "bad" : "ok");
+    line(c, snap.computer.driver_present
+          ? "Driver present" + (snap.computer.driver_version ? " " + snap.computer.driver_version : "") + ", sir."
+          : "No desktop driver here, sir — honest-absent.", "dim");
+    var f = el("fleet"), s = snap.ssh_fleet;
+    if (!s.configured) {
+      line(f, "No fleet allowlisted, sir.", "dim");
+    } else {
+      s.hosts.forEach(function (h) {
+        line(f, h.name + ": key " + (h.key_present ? "present" : "MISSING") + ", sir.", h.key_present ? "ok" : "bad");
+      });
+    }
+    line(f, "Every remote act is L2 under W8 rails, sir.", "dim");
+    var t = el("tg");
+    line(t, snap.telegram.state === "configured"
+          ? "Telegram remote live, " + snap.telegram.open + " open, sir."
+          : "No bot token, sir — honest-absent; requests queue but cannot send.", "dim");
+    var h = el("car");
+    line(h, snap.car_home.state === "keyed"
+          ? "Car/home keys present, sir — acts L2 + freeze-gated."
+          : "No car/home keys, sir — honest-absent, never dials.", "dim");
+    var k = el("kill");
+    line(k, snap.kill.frozen ? "FROZEN (" + snap.kill.reason + ") — all hands denied, sir."
+          : "All hands live under freeze, sir — one kill denies every act.", snap.kill.frozen ? "bad" : "ok");
+  }).catch(function () {
+    el("snapline").textContent =
+      "No hands snapshot, sir — log in at the voice page first, then deploy the snapshot.";
+  });
+})();
+</script>
+</body>
+</html>

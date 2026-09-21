@@ -180,3 +180,20 @@ it would break single-port forwarding and need its own auth story.
   only — no calls/attrs/imports). Delegate scenarios fold into one
   `delegate_task`-compatible tasks-batch payload (upstream gate mirrored
   from `tools/delegate_tool_tasks.py`); plan-only, execution stays in-agent.
+
+## W11 — hands everywhere page
+
+- **Hands page** (`hands.html`, new file, same auth gate): renders
+  `<home>/web_dist_overlay/hands-snapshot.json` — computer-use state
+  (off/manifest/driver), SSH fleet hosts (names + key presence, never
+  paths), Telegram state, car/home state, freeze gates. Snapshot built
+  on demand by `jarvis/bin/jarvis-doctor-hands` (no cron job — hands are
+  on-demand; the page reads live-deployed state, same serving choice).
+- Hands (all new, all plan-only, execution stays in-agent): computer-use
+  bounded manifests only, default OFF, YOLO refused-always (even
+  attended); SSH fleet allowlisted + key-based, every remote act L2 with
+  voice-pin under W8 rails; Telegram remote files W8 L2 approval
+  requests (queued when the token is absent, sendable only when
+  configured); car/home presence-probe only (never connects; homelab
+  untouched). One kill (`jarvis-hands kill all`) freezes via W8 and
+  denies every hand's acts.
