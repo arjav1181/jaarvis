@@ -145,3 +145,21 @@ it would break single-port forwarding and need its own auth story.
   `<home>/web_dist_overlay` (same serving choice as W3 — no new auth story).
   Pages fetch only their own `./*.json` snapshot (asserted: single fetch,
   zero external, text-only rendering).
+
+## W7 — apex beast page
+
+- **Apex page** (`apex.html`, new file, same auth gate): renders
+  `<home>/web_dist_overlay/apex-snapshot.json` — GPU ladder rung + evidence,
+  STT engine, Discord VC status, GPT-Live / jarvis-review / Langfuse states,
+  achievements earned + locked. Written every 30 min by the
+  `jarvis-apex-snapshot` job (`jarvis/bin/jarvis-doctor-apex`,
+  installed by `jarvis/apex/ensure-apex.sh` — touches no W5/W8 job).
+- CLIs (all new, all honest-absent at boundaries): `jarvis-stt-stream`
+  (JSONL partials + final with measured per-window ms), `jarvis-apex-say`
+  (streaming sentence TTS via `jarvis-speak`, `--dry-run` spends nothing),
+  `jarvis-discord-vc` (credential/allowlist gate, exit 2 when absent),
+  `jarvis-gpt-live` (cost disclosure + `--i-accept-costs` + key required),
+  `jarvis-review` (`jarvis/moa/jarvis-review.json` preset: cheap refs +
+  frontier aggregator, privacy full; plan only, execution stays in-agent),
+  `jarvis-langfuse` (consent record, never activates), `jarvis-achieve`
+  (computed badges over `jarvis/apex/events.jsonl`).

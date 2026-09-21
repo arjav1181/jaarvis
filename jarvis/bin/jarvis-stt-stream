@@ -1,0 +1,63 @@
+#!/usr/bin/env python3
+"""jarvis-stt-stream — chunked transcription with live JSONL partials (W7).
+
+Usage: jarvis-stt-stream <audio.wav> [--window-ms 5000] [--thread-file F]
+Emits {"type":"partial",...} per window then one {"type":"final",...}.
+MP3/other inputs: convert first (ffmpeg -i in.wav ...). No STT engine here
+-> EngineAbsent with the honest reason (exit 3), never silence.
+"""
+import json
+import sys
+from pathlib import Path
+
+REPO = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(REPO))
+
+from jarvis.apex import stt_partials as stt
+
+
+def main() -> int:
+    args = sys.argv[1:]
+    if not args or args[0] in ("-h", "--help"):
+        print(__doc__.strip())
+        return 0
+    window_ms = 5000
+    thread_file = None
+    rest = []
+    it = iter(args)
+    for a in it:
+        if a == "--window-ms":
+            window_ms = int(next(it))
+        elif a == "--thread-file":
+            thread_file = Path(next(it))
+        else:
+            rest.append(a)
+    src = Path(rest[0])
+    try:
+        wav_bytes = src.read_bytes()
+    except OSError as e:
+        print(f"cannot read {src}: {e}")
+        return 1
+    try:
+        engine = stt.default_engine()
+    except stt.EngineAbsent as e:
+        print(json.dumps({"type": "engine-absent", "reason": str(e)}))
+        return 3
+    tf = None
+    if thread_file:
+        thread_file.parent.mkdir(parents=True, exist_ok=True)
+        tf = thread_file.open("a")
+    try:
+        for ev in stt.stream_partials(wav_bytes, engine, window_ms):
+            print(json.dumps(ev), flush=True)
+            if tf and ev["type"] == "partial" and ev.get("text"):
+                tf.write(f"[{ev['index'] + 1}/{ev['total']}] {ev['text']}\n")
+                tf.flush()
+    finally:
+        if tf:
+            tf.close()
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
