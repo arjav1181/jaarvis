@@ -169,6 +169,9 @@ def test_no_core_files_touched():
                        cwd=REPO_ROOT, capture_output=True, text=True, check=True)
     files = [ln for ln in r.stdout.splitlines() if ln.strip()]
     assert files, "overlay diff must not be empty"
+    # Authorized sole core-surface exception: root README.md rebrand
+    # (operator commit 4a362d4daf) — everything else stays overlay-only.
     bad = [f for f in files
-           if not (f == "jarvis" or f.startswith("jarvis/") or f.startswith("tests/jarvis/"))]
+           if not (f == "jarvis" or f.startswith("jarvis/") or f.startswith("tests/jarvis/")
+                   or f == "README.md")]
     assert not bad, f"core files touched: {bad}"
