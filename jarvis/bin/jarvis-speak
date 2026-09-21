@@ -1,0 +1,54 @@
+#!/usr/bin/env python3
+"""jarvis-speak — proactivity speaker (W8). Honors the silence flag.
+
+Usage: jarvis-speak (--brief [--soul NAME] | --alert TEXT) [--dry-run]
+  --dry-run prints the payload instead of speaking (headless boxes have no
+  speakers; the TTS path itself is proven in W12). Silenced -> prints
+  SILENCED and speaks nothing, dry-run or not.
+"""
+import argparse
+import datetime
+import json
+import sys
+from pathlib import Path
+
+REPO = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO / "proactivity"))
+sys.path.insert(0, str(REPO / "soul"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+import settings as pro_settings
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--brief", action="store_true")
+    ap.add_argument("--alert", default="")
+    ap.add_argument("--soul", default="jarvis")
+    ap.add_argument("--dry-run", action="store_true")
+    args = ap.parse_args()
+    if args.brief:
+        import brief as pro_brief
+        text = pro_brief.build(args.soul, datetime.datetime.now())
+        kind = "brief"
+    elif args.alert:
+        import alerts as pro_alerts  # noqa: F401 (documents the alert path)
+        text = args.alert
+        kind = "alert"
+    else:
+        print("usage: jarvis-speak (--brief [--soul NAME] | --alert TEXT) [--dry-run]")
+        return 2
+    if pro_settings.is_silenced():
+        print(json.dumps({"kind": kind, "state": "SILENCED", "text": text}))
+        return 0
+    if args.dry_run:
+        print(json.dumps({"kind": kind, "state": "WOULD-SPEAK", "text": text}))
+        return 0
+    from tools.tts_tool import text_to_speech_tool
+    out = text_to_speech_tool(text)
+    print(json.dumps({"kind": kind, "state": "SPOKEN", "result": json.loads(out).get("file_path")}))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

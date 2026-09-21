@@ -1,0 +1,80 @@
+#!/usr/bin/env python3
+"""jarvis-permissions — operator CLI for the W8 smart-permissions layer.
+
+Read-only probes run anywhere; writes honor HERMES_HOME (default ~/.jarvis).
+Every decision lands in the audit ledger (audit.py) unless noted.
+"""
+import json
+import sys
+from pathlib import Path
+
+PERM = Path(__file__).resolve().parents[1] / "permissions"
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+from jarvis.permissions._common import jarvis_dir  # noqa: E402
+from jarvis.permissions import risk as _risk  # noqa: E402
+from jarvis.permissions import allowlist as _allow  # noqa: E402
+from jarvis.permissions import voice_pin as _pin  # noqa: E402
+from jarvis.permissions import freeze as _freeze  # noqa: E402
+from jarvis.permissions import audit as _audit  # noqa: E402
+from jarvis.permissions import telegram as _tg  # noqa: E402
+
+
+def _out(obj) -> int:
+    print(json.dumps(obj, indent=2, sort_keys=True))
+    return 0
+
+
+def main(argv) -> int:
+    if not argv or argv[0] in ("-h", "--help"):
+        print("usage: jarvis-permissions assess KIND TARGET [--irreversible] | "
+              "freeze STATUS|REASON... | thaw THAW | party | pin-set PIN | pin-check PIN | "
+              "allow-propose PATTERN | allow-decide ID yes|no | allow-list [STATUS] | "
+              "audit [LIMIT] | tg-status")
+        return 2
+    cmd, rest = argv[0], argv[1:]
+    if cmd == "assess":
+        if len(rest) < 2:
+            print("usage: assess KIND TARGET [--irreversible]", file=sys.stderr)
+            return 2
+        action = {"kind": rest[0], "target": rest[1],
+                  "irreversible": "--irreversible" in rest}
+        result = _risk.assess(action)
+        _audit.log({"actor": "cli", "action": f"assess {action['kind']}",
+                    "decision": "allowed" if result["level"] == "L0" else "denied",
+                    "detail": f"{result['level']}/{result['confirm']} score={result['score']}"})
+        return _out({"action": action, **result})
+    if cmd == "freeze":
+        if rest and rest[0] == "STATUS":
+            return _out(_freeze.status())
+        return _out(_freeze.freeze(" ".join(rest) or "manual freeze"))
+    if cmd == "thaw":
+        return _out(_freeze.unfreeze(rest[0] if rest else ""))
+    if cmd == "party":
+        return _out(_freeze.house_party())
+    if cmd == "pin-set":
+        try:
+            return _out(_pin.set_pin(rest[0] if rest else ""))
+        except (ValueError, PermissionError) as exc:
+            return _out({"ok": False, "reason": str(exc)})
+    if cmd == "pin-check":
+        return _out(_pin.verify(rest[0] if rest else ""))
+    if cmd == "allow-propose":
+        return _out(_allow.propose(" ".join(rest)))
+    if cmd == "allow-decide":
+        if len(rest) < 2 or rest[1] not in ("yes", "no"):
+            print("usage: allow-decide ID yes|no", file=sys.stderr)
+            return 2
+        return _out(_allow.decide(rest[0], rest[1] == "yes"))
+    if cmd == "allow-list":
+        return _out(_allow.list_rules(rest[0] if rest else "all"))
+    if cmd == "audit":
+        return _out(_audit.tail(int(rest[0]) if rest else 10))
+    if cmd == "tg-status":
+        return _out(_tg.status())
+    print(f"unknown command {cmd!r}", file=sys.stderr)
+    return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv[1:]))
