@@ -197,3 +197,25 @@ it would break single-port forwarding and need its own auth story.
   configured); car/home presence-probe only (never connects; homelab
   untouched). One kill (`jarvis-hands kill all`) freezes via W8 and
   denies every hand's acts.
+
+## W9 — presence everywhere page
+
+- **Satellite page** (`presence.html`, new file, same auth gate, no new
+  auth surface): `?room=kitchen&device=phone` registers this tab as a
+  room satellite (heartbeat 15s, outbox poll 3s, intercom spoken aloud
+  via the existing `/api/audio/speak`); `?view=status` is the standby
+  status page (who's listening where — a silent satellite shows silent).
+  Push-to-talk reuses `/api/audio/transcribe` + the existing WS
+  (`session.create` / `prompt.submit`) with a `[room:X]` tag so replies
+  stay room-aware. Phone-as-satellite = this page on mobile (same
+  endpoints the voice page uses; the voice page itself is untouched).
+- Backend is the sanctioned plugin seam: `jarvis/plugins/presence/`
+  deploys to `<home>/plugins/presence/` (`jarvis-presence deploy
+  --home`), enabled via `hermes plugins enable presence` + dashboard
+  restart; `/api/plugins/presence/*` (register/heartbeat/status/
+  intercom/outbox/ack) inherits the dashboard cookie gate + the plugin
+  runtime allow-list. State is `<home>/jarvis/presence.json` (45s stale
+  → silent, 1h prune; intercom to silent rooms refuses honestly).
+- Intercom intents (`jarvis-presence intercom --parse "tell the kitchen:
+  …"`) route to live satellites only; operator-initiated like
+  `jarvis-speak --alert` (no L2 — it is the operator's own command).

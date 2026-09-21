@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<!--
+  presence.html — W9 room satellite. An authed browser page (same cookie gate
+  as every HUD page): registers as a room satellite, heartbeats, polls its
+  intercom outbox aloud, shows the standby roster, and offers push-to-talk
+  whose prompts carry a [room:X] tag so replies stay room-aware.
+  ?room=kitchen&device=phone  ·  ?view=status (roster only, no mic)
+  No new auth surface: /api/plugins/presence/* inherits the dashboard gate.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>presence — room satellite</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 0 auto; max-width: 640px;
+         padding: 16px; background: #0b0e14; color: #dfe6f3; }
+  .hidden { display: none; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  button, input, select { font-size: 1rem; padding: 8px 12px; border-radius: 8px;
+    border: 1px solid #334; background: #161b26; color: #dfe6f3; }
+  button:disabled { opacity: 0.4; }
+  #log { white-space: pre-wrap; font-size: 0.9rem; background: #11151f;
+         border-radius: 8px; padding: 10px; min-height: 120px; max-height: 300px;
+         overflow-y: auto; }
+  .sat { border: 1px solid #334; border-radius: 8px; padding: 8px; margin: 6px 0; }
+  .silent { opacity: 0.55; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 10px;
+           font-size: 0.8rem; background: #1d2b1d; }
+  .badge.stale { background: #2b1d1d; }
+  h1 { font-size: 1.2rem; }
+</style>
+</head>
+<body>
+<h1>presence — <span id="roomtitle">lounge</span></h1>
+
+<div id="login">
+  <p>Sign in with the dashboard account (same gate as every HUD page).</p>
+  <div class="row">
+    <input id="user" value="sir" autocomplete="username">
+    <input id="pass" type="password" autocomplete="current-password">
+    <button id="loginbtn">sign in</button>
+  </div>
+  <p id="loginerr"></p>
+</div>
+
+<div id="app" class="hidden">
+  <p id="statusline">connecting…</p>
+  <div class="row">
+    <button id="ptt">hold to talk</button>
+    <span id="micstate">mic idle</span>
+  </div>
+  <h2>say it here, hear it there (intercom)</h2>
+  <div class="row">
+    <input id="toroom" placeholder="room (or 'all')" size="12">
+    <input id="totext" placeholder="message" size="28">
+    <button id="sendbtn">send</button>
+  </div>
+  <h2>who's listening where</h2>
+  <div id="roster"><p>loading…</p></div>
+  <h2>satellite log</h2>
+  <div id="log"></div>
+</div>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const q = new URLSearchParams(location.search);
+const VIEW_STATUS = (q.get("view") || "") === "status";
+const ROOM = (q.get("room") || "lounge").toLowerCase();
+const DEVICE = q.get("device") || "browser";
+const SAT = "sat-" + Math.random().toString(36).slice(2, 10);
+const S = { ws: null, sid: null, req: 0, rec: null, listening: false,
+            audio: null };
+$("roomtitle").textContent = VIEW_STATUS ? "standby status" : ROOM;
+if (VIEW_STATUS) { const p = $("ptt"); if (p) p.disabled = true; }
+
+function log(t) {
+  const el = $("log");
+  el.textContent += t + "\n";
+  el.scrollTop = el.scrollHeight;
+}
+async function api(path, opts) {
+  const o = Object.assign({ credentials: "include",
+    headers: { "Content-Type": "application/json" } }, opts || {});
+  const r = await fetch(path, o);
+  if (r.status === 401) throw new Error("unauthenticated");
+  return r.json();
+}
+async function speak(text) {
+  try {
+    const j = await api("/api/audio/speak", { method: "POST",
+      body: JSON.stringify({ text }) });
+    if (j.ok && j.data_url) {
+      if (S.audio) { try { S.audio.pause(); } catch (e) { /* overlap */ } }
+      S.audio = new Audio(j.data_url);
+      await S.audio.play();
+    }
+  } catch (e) { log("speak failed: " + e.message); }
+}
+
+// ---- presence loops ----
+async function register() {
+  const j = await api("/api/plugins/presence/register", { method: "POST",
+    body: JSON.stringify({ satellite_id: SAT, room: ROOM, device: DEVICE,
+                           mic: !VIEW_STATUS, speaker: true }) });
+  if (!j.ok) throw new Error("register: " + (j.reason || "rejected"));
+  log("registered as " + SAT + " in " + ROOM);
+}
+async function beat() {
+  try {
+    await api("/api/plugins/presence/heartbeat", { method: "POST",
+      body: JSON.stringify({ satellite_id: SAT, listening: S.listening }) });
+  } catch (e) { /* next beat retries */ }
+}
+async function poll() {
+  try {
+    const j = await api("/api/plugins/presence/outbox?satellite_id=" +
+      encodeURIComponent(SAT));
+    if (!j.ok || !j.messages || !j.messages.length) return;
+    const ids = [];
+    for (const m of j.messages) {
+      ids.push(m.id);
+      log("intercom from " + m.from + ": " + m.text);
+      await speak(m.text);
+    }
+    await api("/api/plugins/presence/ack", { method: "POST",
+      body: JSON.stringify({ satellite_id: SAT, ids }) });
+  } catch (e) { /* next poll retries */ }
+}
+async function roster() {
+  try {
+    const j = await api("/api/plugins/presence/status");
+    const box = $("roster");
+    box.textContent = "";
+    if (!j.satellites || !j.satellites.length) {
+      box.textContent = "no satellites — honest silence.";
+      return;
+    }
+    for (const s of j.satellites) {
+      const d = document.createElement("div");
+      d.className = "sat" + (s.stale ? " silent" : "");
+      const b = document.createElement("span");
+      b.className = "badge" + (s.stale ? " stale" : "");
+      b.textContent = s.stale ? "silent" : (s.listening ? "listening" : "live");
+      d.appendChild(b);
+      const t = document.createElement("span");
+      t.textContent = " " + s.room + " · " + s.satellite + " · " +
+        s.device + " · " + s.age_s + "s ago · pending " + s.pending;
+      d.appendChild(t);
+      box.appendChild(d);
+    }
+    $("statusline").textContent = j.live + " live, " + j.silent +
+      " silent — " + SAT + " in " + ROOM;
+  } catch (e) { /* roster retries on timer */ }
+}
+
+// ---- mic: transcribe -> room-tagged prompt over the existing WS ----
+function micSupported() {
+  return !!(navigator.mediaDevices && window.MediaRecorder);
+}
+async function ensureWs() {
+  if (S.ws && (S.ws.readyState === 0 || S.ws.readyState === 1)) return;
+  const t = await api("/api/auth/ws-ticket", { method: "POST", body: "{}" });
+  if (!t.ticket) throw new Error("no WS ticket");
+  const proto = location.protocol === "https:" ? "wss:" : "ws:";
+  const ws = new WebSocket(proto + "//" + location.host +
+    "/api/ws?ticket=" + encodeURIComponent(t.ticket));
+  S.ws = ws;
+  ws.onmessage = onWsMsg;
+  await new Promise((res, rej) => {
+    ws.onopen = res; ws.onerror = () => rej(new Error("WS failed"));
+  });
+  const sid = await rpc("session.create", {});
+  S.sid = sid.session_id || sid;
+}
+function rpc(method, params) {
+  return new Promise((res, rej) => {
+    const id = "p" + (++S.req);
+    const h = (ev) => {
+      let d;
+      try { d = JSON.parse(ev.data); } catch (e) { return; }
+      if (d.id === id) {
+        S.ws.removeEventListener("message", h);
+        if (d.error) rej(new Error(d.error.message || "RPC error"));
+        else res(d.result);
+      }
+    };
+    S.ws.addEventListener("message", h);
+    S.ws.send(JSON.stringify({ jsonrpc: "2.0", id, method, params }));
+    setTimeout(() => { S.ws.removeEventListener("message", h);
+      rej(new Error("RPC timeout")); }, 30000);
+  });
+}
+let replyBuf = "";
+function onWsMsg(ev) {
+  let d;
+  try { d = JSON.parse(ev.data); } catch (e) { return; }
+  const p = d.params || {};
+  if (p.type === "message.delta" && p.payload && p.payload.text) {
+    replyBuf += p.payload.text;
+  } else if (p.type === "turn.end") {
+    const t = replyBuf.trim();
+    replyBuf = "";
+    if (t) { log("jarvis: " + t); speak(t); }
+  } else if (p.type === "turn.error") {
+    log("turn error");
+  }
+}
+async function startRec() {
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  const rec = new MediaRecorder(stream);
+  const chunks = [];
+  rec.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+  rec.onstop = async () => {
+    stream.getTracks().forEach((t) => t.stop());
+    const blob = new Blob(chunks, { type: rec.mimeType || "audio/webm" });
+    const fr = new FileReader();
+    fr.onload = async () => {
+      try {
+        const j = await api("/api/audio/transcribe", { method: "POST",
+          body: JSON.stringify({ data_url: fr.result,
+                                 mime_type: blob.type }) });
+        const heard = (j.transcript || "").trim();
+        if (!heard) { log("heard silence"); return; }
+        log("[" + ROOM + "] you: " + heard);
+        await ensureWs();
+        await rpc("prompt.submit", { session_id: S.sid,
+          text: "[room:" + ROOM + "] " + heard });
+      } catch (e) { log("talk failed: " + e.message); }
+    };
+    fr.readAsDataURL(blob);
+  };
+  S.rec = rec;
+  rec.start(250);
+  S.listening = true;
+  $("micstate").textContent = "mic live";
+}
+function stopRec() {
+  if (S.rec && S.rec.state !== "inactive") { try { S.rec.stop(); } catch (e) { /* end */ } }
+  S.rec = null;
+  S.listening = false;
+  $("micstate").textContent = "mic idle";
+}
+
+// ---- wiring ----
+$("loginbtn").onclick = async () => {
+  $("loginerr").textContent = "";
+  try {
+    const r = await fetch("/auth/password-login", { method: "POST",
+      credentials: "include", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ provider: "basic", username: $("user").value,
+                             password: $("pass").value }) });
+    const j = await r.json();
+    if (!r.ok || !j.ok) throw new Error("login rejected (" + r.status + ")");
+    $("pass").value = "";
+    boot();
+  } catch (e) { $("loginerr").textContent = e.message; }
+};
+$("sendbtn").onclick = async () => {
+  const target = $("toroom").value.trim().toLowerCase();
+  const text = $("totext").value.trim();
+  if (!text || !target) return;
+  const body = { text, frm: ROOM + "/" + SAT };
+  if (target === "all") body.to_all = true;
+  else body.to_room = target;
+  try {
+    const j = await api("/api/plugins/presence/intercom",
+      { method: "POST", body: JSON.stringify(body) });
+    log(j.ok ? "sent to " + j.targets.join(",") : "send failed: " + j.reason);
+    $("totext").value = "";
+  } catch (e) { log("send failed: " + e.message); }
+};
+async function boot() {
+  $("login").classList.add("hidden");
+  $("app").classList.remove("hidden");
+  try {
+    await register();
+    await roster();
+    setInterval(beat, 15000);
+    setInterval(poll, 3000);
+    setInterval(roster, 10000);
+    log("satellite live — two tabs, two ?room= values, two rooms.");
+  } catch (e) {
+    $("statusline").textContent = "presence unavailable: " + e.message;
+  }
+}
+(function init() {
+  if (VIEW_STATUS) { const p = $("ptt"); if (p) p.style.display = "none"; }
+  const ptt = $("ptt");
+  if (!micSupported()) { ptt.disabled = true; $("micstate").textContent = "no mic"; return; }
+  ptt.addEventListener("pointerdown", () => { startRec().catch((e) => {
+    $("micstate").textContent = "mic denied"; }); });
+  ptt.addEventListener("pointerup", stopRec);
+  ptt.addEventListener("pointerleave", stopRec);
+  // already authed (cookie)? skip login
+  api("/api/plugins/presence/status").then(boot).catch(() => { /* login */ });
+})();
+</script>
+</body>
+</html>
