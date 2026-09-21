@@ -1,0 +1,22 @@
+{
+  "aggregator": {
+    "model": "frontier",
+    "note": "acts with full tools; frontier-grade reasoning"
+  },
+  "description": "Jarvis hard-task review: cheap references advise once, frontier aggregator acts. HTR-MOA1.",
+  "fanout": "user_turn",
+  "name": "jarvis-review",
+  "privacy_filter": "full",
+  "references": [
+    {
+      "model": "cheap",
+      "role": "skeptic",
+      "task": "find flaws, missing edge cases, cheaper alternatives"
+    },
+    {
+      "model": "cheap",
+      "role": "simplifier",
+      "task": "propose the smallest change that solves it"
+    }
+  ]
+}
