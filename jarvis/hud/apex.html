@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Apex beast — Jarvis</title>
+<style>
+  :root { color-scheme: dark; }
+  body { background: #101418; color: #E8F4FF; font-family: system-ui, sans-serif;
+         margin: 0; padding: 16px; max-width: 720px; }
+  h1 { color: #9ADCFF; font-size: 1.3rem; margin: 0 0 4px; }
+  .sub { color: #5B7A90; font-size: 0.85rem; margin-bottom: 12px; }
+  section { border: 1px solid #2E4A5E; border-radius: 8px; padding: 10px 12px;
+            margin: 10px 0; }
+  section h2 { color: #7FD0FF; font-size: 1rem; margin: 0 0 6px; }
+  .ok { color: #8FBC8F; } .bad { color: #ef5350; } .dim { color: #7A8A99; }
+  .badge { display: inline-block; border: 1px solid #2E4A5E; border-radius: 12px;
+           padding: 2px 10px; margin: 2px 4px 2px 0; font-size: 0.8rem; }
+  .badge.earned { border-color: #7FD0FF; color: #CDF0FF; }
+  .badge.locked { opacity: 0.45; }
+  a { color: #7FD0FF; }
+</style>
+</head>
+<body>
+<h1>◆ Apex beast</h1>
+<div class="sub" id="snapline">reading the last apex snapshot…</div>
+<section><h2>Compute — GPU ladder</h2><div id="ladder"></div></section>
+<section><h2>Ears — STT engines</h2><div id="stt"></div></section>
+<section><h2>Discord voice</h2><div id="vc"></div></section>
+<section><h2>Mouths — GPT-Live / review / Langfuse</h2><div id="mouths"></div></section>
+<section><h2>Achievements</h2><div id="badges"></div></section>
+<div class="sub"><a href="./voice.html">← back to the voice page</a> ·
+<a href="./diag.html">suit diagnostics</a> · <a href="./audit.html">audit ledger</a></div>
+<script>
+(function () {
+  "use strict";
+  function el(id) { return document.getElementById(id); }
+  function line(parent, text, cls) {
+    var d = document.createElement("div");
+    if (cls) d.className = cls;
+    d.textContent = text;
+    parent.appendChild(d);
+  }
+  fetch("./apex-snapshot.json", { credentials: "include" }).then(function (r) {
+    if (!r.ok) throw new Error("http " + r.status);
+    return r.json();
+  }).then(function (snap) {
+    el("snapline").textContent = "snapshot " + snap.built_at + ", sir.";
+    var l = el("ladder"), lad = snap.ladder;
+    line(l, "Selected rung: " + lad.selected + " — " + lad.reason + ", sir.",
+         lad.gpu_present ? "ok" : "dim");
+    line(l, "nvidia-smi: " + (lad.evidence.nvidia_smi.ok ? lad.evidence.nvidia_smi.out : "absent")
+         + " · torch.cuda: " + lad.evidence.torch_cuda.how + ", sir.", "dim");
+    var s = el("stt"), e = snap.stt_engines;
+    line(s, e.preferred ? "Engine: " + e.preferred + ", sir." : "No STT engine, sir — partials run on demand only.", e.preferred ? "ok" : "bad");
+    var v = el("vc"), d = snap.discord_vc;
+    line(v, d.configured ? "Voice channel ready, sir." : "Not configured, sir — token or allowlist missing (honest-absent).", d.configured ? "ok" : "dim");
+    var m = el("mouths");
+    line(m, "GPT-Live mouth: " + (snap.gpt_live.enabled ? "OPTED-IN, sir — costs accrue." : "off, sir — default mouth."), snap.gpt_live.enabled ? "bad" : "ok");
+    line(m, "jarvis-review preset: " + snap.review_preset.name + (snap.review_preset.check.ok ? " (valid), sir." : " (INVALID), sir."), snap.review_preset.check.ok ? "ok" : "bad");
+    line(m, "Langfuse tracing: " + (snap.langfuse.tracing_live ? "LIVE, sir." : "off, sir."), "dim");
+    var b = el("badges"), a = snap.achievements;
+    Object.keys(a.earned).forEach(function (k) {
+      var s2 = document.createElement("span");
+      s2.className = "badge earned";
+      s2.textContent = "◆ " + a.earned[k].badge;
+      b.appendChild(s2);
+    });
+    Object.keys(a.locked).forEach(function (k) {
+      var s2 = document.createElement("span");
+      s2.className = "badge locked";
+      s2.textContent = "◇ " + a.locked[k].name + " — " + a.locked[k].desc;
+      b.appendChild(s2);
+    });
+    line(b, a.events + " events on " + a.active_days + " days, sir.", "dim");
+  }).catch(function () {
+    el("snapline").textContent =
+      "No apex snapshot, sir — log in at the voice page first, then let the apex job run.";
+  });
+})();
+</script>
+</body>
+</html>
