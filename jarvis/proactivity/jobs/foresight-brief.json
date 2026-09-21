@@ -1,0 +1,13 @@
+{
+  "name": "jarvis-foresight-brief",
+  "schedule": "30 21 * * *",
+  "prompt": "Run the foresight brief: `HERMES_HOME=/home/runner/.jarvis-test PATH=/home/runner/.venvs/jarvis-w0/bin:$PATH jarvis/bin/jarvis-doctor-foresight > /home/runner/.jarvis-test/web_dist_overlay/foresight-snapshot.json` from /home/runner/workspace/hermes-fork. Report one line (calibration headline, open/overdue counts, snapshot written). If the runner itself fails, say so in one line and stop. Never send, post, or merge anything.",
+  "skills": [],
+  "model": "auto/best-reasoning",
+  "provider": "custom",
+  "continuity": false,
+  "deliver": "local",
+  "failure_deliver": "local",
+  "workdir": "/home/runner/workspace/hermes-fork",
+  "monitor_script": null
+}

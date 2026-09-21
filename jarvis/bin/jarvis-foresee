@@ -1,0 +1,68 @@
+#!/usr/bin/env python3
+"""jarvis-foresee — foresight engine CLI (W10). record | resolve | list | calibrate | run-suite | brief (JSON out)."""
+import argparse
+import json
+import sys
+from pathlib import Path
+
+REPO = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(REPO))
+
+from jarvis.foresight import brief as _brief
+from jarvis.foresight import calibrate as _cal
+from jarvis.foresight import ledger as _ledger
+from jarvis.foresight import runner as _runner
+from jarvis.foresight.suites import load_suite
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    sub = ap.add_subparsers(dest="cmd", required=True)
+    r = sub.add_parser("record")
+    r.add_argument("--question", required=True)
+    r.add_argument("--predicted", required=True)
+    r.add_argument("--confidence", required=True, type=float)
+    r.add_argument("--horizon", required=True)
+    r.add_argument("--author", default="operator")
+    v = sub.add_parser("resolve")
+    v.add_argument("--id", required=True)
+    v.add_argument("--outcome", required=True)
+    v.add_argument("--resolver", default="operator")
+    v.add_argument("--note", default="")
+    li = sub.add_parser("list")
+    li.add_argument("--status", choices=("open", "resolved", "overdue"), default=None)
+    sub.add_parser("calibrate")
+    s = sub.add_parser("run-suite")
+    s.add_argument("--file", required=True)
+    s.add_argument("--author", default="operator")
+    sub.add_parser("brief")
+    a = ap.parse_args()
+
+    if a.cmd == "record":
+        res = _ledger.record(a.question, a.predicted, a.confidence,
+                             a.horizon, author=a.author)
+    elif a.cmd == "resolve":
+        res = _ledger.resolve(a.id, a.outcome, resolver=a.resolver, note=a.note)
+    elif a.cmd == "list":
+        if a.status == "overdue":
+            res = {"entries": _ledger.overdue()}
+        else:
+            res = {"entries": _ledger.list_entries(a.status)}
+    elif a.cmd == "calibrate":
+        res = _cal.score(_ledger.list_entries())
+    elif a.cmd == "run-suite":
+        suite, errors = load_suite(a.file)
+        if errors:
+            print(json.dumps({"ok": False, "errors": errors}, indent=2))
+            return 2
+        res = _runner.run_suite(suite, author=a.author)
+    else:
+        res = _brief.build()
+    print(json.dumps(res, indent=2))
+    if isinstance(res, dict) and res.get("ok") is False:
+        return 2
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

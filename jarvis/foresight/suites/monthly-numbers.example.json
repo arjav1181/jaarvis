@@ -1,0 +1,32 @@
+{
+  "name": "monthly-numbers",
+  "scenarios": [
+    {
+      "id": "model-bill",
+      "kind": "compute",
+      "inputs": {"audio_min": 120, "rate_per_min": 0.006, "fixed": 5.0},
+      "expr": "audio_min * rate_per_min + fixed"
+    },
+    {
+      "id": "brief-tokens",
+      "kind": "compute",
+      "inputs": {"runs": 30, "tokens_k": 4.5, "price_per_mk": 0.15},
+      "expr": "runs * tokens_k * price_per_mk / 1000"
+    },
+    {
+      "id": "watchdog-quiet-streak",
+      "kind": "predict",
+      "question": "Will the ci-watchdog stay quiet for the next 7 days?",
+      "predicted": "yes",
+      "confidence": 0.7,
+      "horizon": "2026-12-31"
+    },
+    {
+      "id": "deep-dive-outage-cause",
+      "kind": "delegate",
+      "role": "foresight-scout",
+      "goal": "Gather the last 7 days of ci-watchdog run outcomes from the rig logs and list the top 3 failure causes with counts.",
+      "context": "Read-only log archaeology; no fixes, no commits."
+    }
+  ]
+}
