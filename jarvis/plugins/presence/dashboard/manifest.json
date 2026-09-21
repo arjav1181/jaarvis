@@ -1,0 +1,1 @@
+{"api": "api.py", "description": "Jarvis multi-room presence: satellite registry, heartbeats, intercom outbox.", "label": "Presence", "name": "presence", "tab": {"hidden": true}, "version": "1.0.0"}

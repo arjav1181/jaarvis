@@ -1,0 +1,64 @@
+#!/usr/bin/env python3
+"""jarvis-doctor-presence — W9 presence checks (JSON out, exit 0 iff all pass)."""
+import json
+import os
+import sys
+from pathlib import Path
+
+REPO = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(REPO))
+
+
+def main() -> int:
+    checks = {}
+    home = os.environ.get("HERMES_HOME", "")
+    checks["hermes_home_explicit"] = {"pass": bool(home), "home": home}
+    try:
+        from jarvis.presence import store as _store
+        st = _store.status(home or None)
+        checks["store_readable"] = {"pass": st["ok"]}
+    except Exception as e:
+        checks["store_readable"] = {"pass": False, "error": str(e)[:120]}
+    man = REPO / "jarvis" / "plugins" / "presence" / "dashboard" / "manifest.json"
+    api = REPO / "jarvis" / "plugins" / "presence" / "dashboard" / "api.py"
+    try:
+        m = json.loads(man.read_text())
+        checks["plugin_manifest"] = {
+            "pass": m.get("name") == "presence" and m.get("api") == "api.py"}
+    except Exception as e:
+        checks["plugin_manifest"] = {"pass": False, "error": str(e)[:120]}
+    src = api.read_text() if api.exists() else ""
+    checks["plugin_router"] = {
+        "pass": all(s in src for s in (
+            "router = APIRouter()", '"/register"', '"/heartbeat"',
+            '"/status"', '"/intercom"', '"/outbox"', '"/ack"'))}
+    page = (REPO / "jarvis" / "hud" / "presence.html").read_text() \
+        if (REPO / "jarvis" / "hud" / "presence.html").exists() else ""
+    checks["page_contract"] = {
+        "pass": bool(page) and "/api/plugins/presence/" in page
+        and "/api/audio/speak" in page and "/api/audio/transcribe" in page}
+    if home:
+        plug = Path(home) / "plugins" / "presence" / "dashboard"
+        checks["plugin_deployed"] = {
+            "pass": (plug / "api.py").exists()
+            and (plug / "store.py").exists()
+            and (plug / "manifest.json").exists()}
+        checks["page_deployed"] = {
+            "pass": (Path(home) / "web_dist_overlay"
+                     / "presence.html").exists()}
+        try:
+            import yaml
+            cfg = yaml.safe_load(
+                open(Path(home) / "config.yaml")) or {}
+            en = (((cfg.get("plugins") or {}).get("enabled")) or [])
+            checks["plugin_enabled"] = {"pass": "presence" in en}
+        except Exception as e:
+            checks["plugin_enabled"] = {"pass": False,
+                                        "error": str(e)[:120]}
+    ok = all(v.get("pass") for v in checks.values())
+    print(json.dumps({"ok": ok, "checks": checks}, indent=1))
+    return 0 if ok else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
