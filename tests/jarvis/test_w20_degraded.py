@@ -459,6 +459,16 @@ def _lane_files():
         ["git", "diff", "--name-only", "origin/jarvis", "w20-degraded"],
         cwd=REPO_ROOT, capture_output=True, text=True, check=True)
     files = [ln for ln in diff.stdout.splitlines() if ln.strip()]
+    if not files:
+        # Post-merge the branch diff is empty: verify the landed wave files.
+        landed = []
+        for t in TURF:
+            p = REPO / t
+            if p.is_dir():
+                landed += [str(x.relative_to(REPO_ROOT)) for x in p.rglob("*") if x.is_file()]
+            elif p.exists():
+                landed.append(t)
+        files = landed
     return sorted(set(files))
 
 
