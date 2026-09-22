@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Degraded mode — Jarvis</title>
+<style>
+  :root { color-scheme: dark; }
+  body { background: #14100a; color: #FFF8DC; font-family: system-ui, sans-serif;
+         margin: 0; padding: 16px; max-width: 720px; }
+  h1 { color: #FFE9A3; font-size: 1.3rem; margin: 0 0 4px; }
+  .sub { color: #B8860B; font-size: 0.85rem; margin-bottom: 12px; }
+  section { border: 1px solid #8B6914; border-radius: 8px; padding: 10px 12px;
+            margin: 10px 0; }
+  section h2 { color: #FFD700; font-size: 1rem; margin: 0 0 6px; }
+  .ok { color: #8FBC8F; } .bad { color: #ef5350; } .dim { color: #8A7A4A; }
+  a { color: #FFD700; }
+  /* W20-DEGRADED-BEGIN: offline banner block (lane D owns this block only) */
+  #banner { border: 2px solid #ef5350; border-radius: 8px; padding: 10px 12px;
+            margin: 10px 0; font-weight: bold; }
+  /* W20-DEGRADED-END */
+</style>
+</head>
+<body>
+<h1>◆ Degraded mode</h1>
+<div class="sub" id="snapline" aria-live="polite">reading the last snapshot…</div>
+<!-- W20-DEGRADED-BEGIN: offline banner block (lane D owns this block only) -->
+<div id="banner" aria-live="assertive">checking the line, sir…</div>
+<!-- W20-DEGRADED-END -->
+<section><h2>Relay</h2><div id="relay"></div></section>
+<section><h2>Queued for replay</h2><div id="queue"></div></section>
+<section><h2>Local caps (no relay needed)</h2><div id="caps"></div></section>
+<div class="sub"><a href="./voice.html">← back to the voice page</a></div>
+<script>
+(function () {
+  "use strict";
+  function el(id) { return document.getElementById(id); }
+  function line(parent, text, cls) {
+    var d = document.createElement("div");
+    if (cls) d.className = cls;
+    d.textContent = text;
+    parent.appendChild(d);
+  }
+  /* W20-DEGRADED-BEGIN: offline banner block (lane D owns this block only) */
+  function paintBanner(snap) {
+    var b = el("banner");
+    if (snap.status === "degraded" && snap.banner) {
+      b.textContent = snap.banner + " — local caps only, nothing invented, sir.";
+    } else if (snap.status === "online") {
+      b.textContent = "the line to the stars is clear, sir.";
+    } else {
+      b.textContent = "No relay configured, sir — local caps only till then.";
+    }
+  }
+  /* W20-DEGRADED-END */
+  fetch("./degraded-snapshot.json", { credentials: "include" }).then(function (r) {
+    if (!r.ok) throw new Error("http " + r.status);
+    return r.json();
+  }).then(function (snap) {
+    el("snapline").textContent = "snapshot " + snap.ts + ", sir.";
+    paintBanner(snap);
+    var rel = el("relay");
+    line(rel, "Status: " + snap.status + ", sir.",
+         snap.status === "online" ? "ok" : "bad");
+    line(rel, "Last probe: " + snap.last_reason + " via " +
+         (snap.host || "unconfigured") + " (" + snap.latency_ms + " ms, sir).", "dim");
+    var q = el("queue");
+    line(q, snap.pending + " item(s) queued for replay, sir.",
+         snap.pending ? "bad" : "ok");
+    var c = el("caps");
+    var caps = snap.capabilities || {};
+    Object.keys(caps).forEach(function (k) {
+      var v = caps[k];
+      line(c, k + ": " + (v.available ? "available" : "refused") +
+           " — " + v.note + ", sir.", v.available ? "ok" : "dim");
+    });
+  }).catch(function () {
+    el("banner").textContent =
+      "my line to the stars is down, sir — no snapshot either; assume offline.";
+    el("snapline").textContent =
+      "No snapshot, sir — run the doctor job, then reload.";
+  });
+})();
+</script>
+</body>
+</html>

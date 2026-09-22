@@ -1,0 +1,24 @@
+<!-- W20-DEGRADED-BEGIN: paste-ready offline banner (lane D owns this block only).
+     Optional: paste inside any HUD page body. Fetches the W20 snapshot
+     (written by jarvis-doctor-degraded); text-only, no external requests.
+     Existing pages were deliberately left untouched so W3/W4/W8/W13 page
+     contracts stay green; this snippet is the sanctioned way to add the
+     banner later without breaking their fetch allowlists. -->
+<div id="w20banner" aria-live="assertive">checking the line, sir…</div>
+<script>
+(function () {
+  "use strict";
+  fetch("./degraded-snapshot.json", { credentials: "include" }).then(function (r) {
+    return r.json();
+  }).then(function (snap) {
+    var b = document.getElementById("w20banner");
+    if (!b) return;
+    if (snap.status === "degraded" && snap.banner) {
+      b.textContent = snap.banner + " — local caps only, sir.";
+    } else if (snap.status === "online") {
+      b.textContent = "the line to the stars is clear, sir.";
+    }
+  }).catch(function () { /* snapshot absent: keep the checking line */ });
+})();
+</script>
+<!-- W20-DEGRADED-END -->
