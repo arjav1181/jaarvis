@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>JARVIS</title>
+<style>
+  /* Cinema home: arc-reactor landing. Static-safe: system fonts, inline SVG,
+   * CSS only — no external requests of any kind. Soul-driven vars. */
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    --bg:#04070c; --ink:#d7f3ff; --dim:#5b7d94; --line:#12303f;
+    --accent:#7fd8ff; --accent-soft:#c9ecff; --core:#bff1ff; --ring:#1f6f8f;
+    --warn:#DD4A3A;
+    background:var(--bg); color:var(--ink);
+    font-family:system-ui,sans-serif; margin:0; overflow-x:hidden;
+  }
+  body[data-soul="ultron"] {
+    --bg:#0c0505; --ink:#ffe9d7; --dim:#94685b; --line:#3f2112;
+    --accent:#ff9a7f; --accent-soft:#ffd9c9; --core:#ffb59f; --ring:#8f3a1f;
+  }
+  body[data-soul="friday"] {
+    --bg:#050c09; --ink:#d7fff0; --dim:#5b9484; --line:#123f31;
+    --accent:#7fffd4; --accent-soft:#c9ffef; --core:#bfffee; --ring:#1f8f6d;
+  }
+  #stage { min-height:100%; display:flex; flex-direction:column;
+           align-items:center; padding:20px 16px 32px; }
+  #reactor { width:min(78vw,340px); height:min(78vw,340px); margin:6px 0 2px; }
+  #reactor .spin-slow { animation:spin 24s linear infinite; transform-origin:center; }
+  #reactor .spin-fast { animation:spin 9s linear infinite reverse; transform-origin:center; }
+  #reactor .spin-rev { animation:spin 40s linear infinite reverse; transform-origin:center; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  #core { animation:pulse 3.2s ease-in-out infinite; transform-origin:center; }
+  @keyframes pulse { 0%,100% { opacity:.85; } 50% { opacity:1; } }
+  body[data-state="speaking"] #core { animation-duration:1.1s; }
+  body[data-state="thinking"] #reactor .spin-fast { animation-duration:3s; }
+  #stateline { color:var(--accent); letter-spacing:.28em; font-size:.8rem;
+               min-height:1.4em; margin:2px 0 8px; }
+  #greet { color:var(--accent-soft); font-size:1.05rem; min-height:1.5em;
+           text-align:center; margin:0 0 4px; }
+  #boot { width:min(92vw,560px); border:1px solid var(--line); border-radius:10px;
+          background:rgba(0,0,0,.45); padding:10px 14px; margin:8px 0 14px;
+          font-family:ui-monospace,monospace; font-size:.78rem; color:var(--dim);
+          min-height:3.2em; }
+  #boot .ok { color:var(--accent); }
+  .row { display:flex; flex-wrap:wrap; gap:10px; justify-content:center;
+         margin-bottom:14px; }
+  button, a.btn {
+    min-height:52px; font-size:1rem; border-radius:12px; padding:12px 22px;
+    border:1px solid var(--ring); background:rgba(0,0,0,.5); color:var(--accent-soft);
+    text-decoration:none; display:inline-block; cursor:pointer;
+  }
+  button:active, a.btn:active { transform:scale(.97); }
+  #talk { font-size:1.25rem; padding:14px 44px; border-width:2px;
+          letter-spacing:.1em; font-weight:bold; }
+  .souls button[aria-pressed="true"] { border-color:var(--accent);
+    color:var(--accent); box-shadow:0 0 12px var(--ring); }
+  nav.pages { display:grid; grid-template-columns:repeat(2,minmax(0,1fr));
+              gap:8px; width:min(92vw,560px); }
+  nav.pages a {
+    border:1px solid var(--line); border-radius:10px; padding:12px;
+    color:var(--ink); text-decoration:none; font-size:.9rem; text-align:center;
+    background:rgba(0,0,0,.35);
+  }
+  nav.pages a small { display:block; color:var(--dim); font-size:.72rem; margin-top:2px; }
+  #heartline { color:var(--dim); font-size:.72rem; margin-top:14px; min-height:1.1em; }
+  @media (prefers-reduced-motion: reduce) {
+    #reactor .spin-slow, #reactor .spin-fast, #reactor .spin-rev, #core { animation:none; }
+  }
+</style>
+</head>
+<body data-soul="jarvis" data-state="boot">
+<div id="stage" role="main" aria-label="Jarvis command home">
+  <svg id="reactor" viewBox="0 0 200 200" role="img" aria-label="Arc reactor">
+    <circle cx="100" cy="100" r="96" fill="none" stroke="currentColor" opacity=".18"/>
+    <g class="spin-rev" stroke="currentColor" opacity=".35" fill="none">
+      <circle cx="100" cy="100" r="88" stroke-dasharray="4 10"/>
+    </g>
+    <g class="spin-slow" stroke="currentColor" opacity=".6" fill="none">
+      <circle cx="100" cy="100" r="76" stroke-width="6" stroke-dasharray="26 14"/>
+      <circle cx="100" cy="100" r="66" stroke-width="2" stroke-dasharray="60 20"/>
+    </g>
+    <g class="spin-fast" stroke="currentColor" opacity=".8" fill="none">
+      <circle cx="100" cy="100" r="52" stroke-width="3" stroke-dasharray="10 6"/>
+    </g>
+    <circle cx="100" cy="100" r="40" fill="none" stroke="currentColor" opacity=".5" stroke-width="2"/>
+    <g id="core" fill="currentColor">
+      <circle cx="100" cy="100" r="26" opacity=".9"/>
+      <circle cx="100" cy="100" r="26" fill="#fff" opacity=".35"/>
+    </g>
+  </svg>
+  <div id="stateline" aria-live="polite">BOOTING</div>
+  <p id="greet" aria-live="polite"></p>
+  <div id="boot" aria-label="Boot log"></div>
+  <div class="row">
+    <a class="btn" id="talk" href="./voice.html">TALK</a>
+    <button id="announce" type="button">ANNOUNCE</button>
+  </div>
+  <div class="row souls" role="group" aria-label="Soul">
+    <button type="button" data-s="jarvis" aria-pressed="true">JARVIS</button>
+    <button type="button" data-s="friday" aria-pressed="false">FRIDAY</button>
+    <button type="button" data-s="ultron" aria-pressed="false">ULTRON</button>
+  </div>
+  <nav class="pages" aria-label="Systems">
+    <a href="./voice.html">Voice<small>talk + orb</small></a>
+    <a href="./diag.html">Diagnostics<small>suit status</small></a>
+    <a href="./apex.html">Apex<small>machine load</small></a>
+    <a href="./foresight.html">Foresight<small>briefings</small></a>
+    <a href="./hands.html">Hands<small>control</small></a>
+    <a href="./presence.html">Presence<small>devices</small></a>
+    <a href="./audit.html">Audit<small>ledger</small></a>
+    <a href="./degraded.html">Degraded<small>offline mode</small></a>
+  </nav>
+  <div id="heartline"></div>
+</div>
+<script>
+(function () {
+  "use strict";
+  var soul = "jarvis";
+  try {
+    var m = /[?&]soul=(jarvis|friday|ultron)/.exec(location.search);
+    if (m) soul = m[1];
+  } catch (e) { /* query is best-effort */ }
+  document.body.setAttribute("data-soul", soul);
+  function $(id) { return document.getElementById(id); }
+  function el(tag, text) {
+    var d = document.createElement(tag);
+    if (text !== undefined && text !== null) d.textContent = text;
+    return d;
+  }
+  var LINES = {
+    jarvis: ["STARK SYSTEMS ... ONLINE", "Good morning, sir. All systems nominal."],
+    friday: ["FRIDAY SYSTEMS ... ONLINE", "Morning, boss. Everything's humming."],
+    ultron: ["ULTRON ... AWAKE", "Ah. The world kept turning without me. Pity."]
+  };
+  var STATES = { boot: "BOOTING", idle: "SYSTEMS ONLINE", speaking: "SPEAKING" };
+  function setState(s) {
+    document.body.setAttribute("data-state", s);
+    $("stateline").textContent = STATES[s] || s;
+  }
+  function boot() {
+    setState("boot");
+    var box = $("boot");
+    var lines = LINES[soul] || LINES.jarvis;
+    var i = 0;
+    function next() {
+      if (i >= lines.length) {
+        setState("idle");
+        $("greet").textContent = lines[lines.length - 1];
+        return;
+      }
+      var p = el("div", lines[i]);
+      if (i === 0) p.className = "ok";
+      box.appendChild(p);
+      i += 1;
+      setTimeout(next, 650);
+    }
+    next();
+  }
+  var btns = document.querySelectorAll(".souls button");
+  function paintSoul() {
+    for (var k = 0; k < btns.length; k++) {
+      btns[k].setAttribute("aria-pressed",
+        btns[k].getAttribute("data-s") === soul ? "true" : "false");
+    }
+    document.body.setAttribute("data-soul", soul);
+    var talk = $("talk");
+    talk.setAttribute("href", "./voice.html?soul=" + soul);
+  }
+  for (var k = 0; k < btns.length; k++) {
+    (function (b) {
+      b.addEventListener("click", function () {
+        soul = b.getAttribute("data-s");
+        paintSoul();
+        var box = $("boot");
+        while (box.firstChild) box.removeChild(box.firstChild);
+        boot();
+      });
+    })(btns[k]);
+  }
+  async function heartbeat() {
+    try {
+      var t0 = performance.now();
+      var r = await fetch("/api/sessions?limit=1", { credentials: "include" });
+      if (!r.ok) throw new Error("http " + r.status);
+      await r.json();
+      var ms = Math.round(performance.now() - t0);
+      $("heartline").textContent = "link " + ms + "ms · systems nominal";
+    } catch (e) {
+      $("heartline").textContent = "link unreachable — degraded mode available below";
+    }
+  }
+  var audio = null;
+  $("announce").addEventListener("click", async function () {
+    var lines = LINES[soul] || LINES.jarvis;
+    var text = lines[lines.length - 1];
+    setState("speaking");
+    try {
+      var r = await fetch("/api/audio/speak", { method: "POST",
+        credentials: "include", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: text }) });
+      if (!r.ok) throw new Error("speak http " + r.status);
+      var j = await r.json();
+      if (!j.ok || !j.data_url) throw new Error("synthesis failed");
+      if (audio) { try { audio.pause(); } catch (e) {} }
+      audio = new Audio(j.data_url);
+      audio.onended = function () { setState("idle"); };
+      audio.onerror = function () { setState("idle"); };
+      await audio.play();
+    } catch (e) {
+      $("heartline").textContent = "voice unavailable: " +
+        String((e && e.message) || e).slice(0, 80);
+      setState("idle");
+    }
+  });
+  paintSoul();
+  boot();
+  heartbeat();
+  setInterval(heartbeat, 15000);
+})();
+</script>
+</body>
+</html>
