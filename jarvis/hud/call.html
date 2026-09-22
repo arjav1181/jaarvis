@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ultron — Call</title>
+<style>
+  /* Call screen: phone-first, fullscreen. Static-safe: no external anything. */
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    --bg:#0c0505; --ink:#ffe9d7; --dim:#94685b; --line:#3f2112;
+    --accent:#ff9a7f; --accent-soft:#ffd9c9; --core:#ffb59f; --ring:#8f3a1f;
+    --end:#c02626;
+    background:var(--bg); color:var(--ink);
+    font-family:system-ui,sans-serif; margin:0;
+    display:flex; flex-direction:column; align-items:center;
+  }
+  body[data-soul="jarvis"] {
+    --bg:#04070c; --ink:#d7f3ff; --dim:#5b7d94; --line:#12303f;
+    --accent:#7fd8ff; --accent-soft:#c9ecff; --core:#bff1ff; --ring:#1f6f8f;
+  }
+  body[data-soul="friday"] {
+    --bg:#050c09; --ink:#d7fff0; --dim:#5b9484; --line:#123f31;
+    --accent:#7fffd4; --accent-soft:#c9ffef; --core:#bfffee; --ring:#1f8f6d;
+  }
+  #who { margin-top:8vh; font-size:1.6rem; letter-spacing:.18em; color:var(--accent); }
+  #state { color:var(--dim); letter-spacing:.24em; font-size:.8rem;
+           margin:6px 0 2vh; min-height:1.3em; }
+  #ring { width:min(64vw,260px); height:min(64vw,260px); }
+  #ring .spin { animation:spin 12s linear infinite; transform-origin:center; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  #pulse { animation:pulse 3s ease-in-out infinite; transform-origin:center; }
+  @keyframes pulse { 0%,100% { opacity:.8; } 50% { opacity:1; } }
+  body[data-state="speaking"] #pulse { animation-duration:.9s; }
+  #level { width:min(70vw,280px); height:26px; margin:2vh 0 1vh; }
+  #heard { color:var(--accent-soft); font-size:.95rem; min-height:2.6em;
+           text-align:center; padding:0 24px; }
+  #pad { flex:1; }
+  #keys { display:grid; grid-template-columns:repeat(3,84px); gap:14px;
+          justify-content:center; margin-bottom:2vh; }
+  #keys button {
+    width:84px; height:84px; border-radius:50%;
+    border:1px solid var(--ring); background:rgba(0,0,0,.5);
+    color:var(--accent-soft); font-size:.7rem; letter-spacing:.06em;
+  }
+  #keys button[aria-pressed="true"] { border-color:var(--accent);
+    box-shadow:0 0 14px var(--ring); color:var(--accent); }
+  #keys button.end { border-color:var(--end); color:#ff8a8a; font-size:1.4rem; }
+  #micbtn { border-width:2px; font-size:1.1rem; }
+  body[data-talking="true"] #micbtn { background:var(--ring); color:#fff; }
+  @media (prefers-reduced-motion: reduce) {
+    #ring .spin, #pulse { animation:none; }
+  }
+</style>
+</head>
+<body data-soul="ultron" data-state="idle" data-talking="false">
+  <div id="who" aria-live="polite">ULTRON</div>
+  <div id="state" aria-live="polite">TAP MIC · SPEAK</div>
+  <svg id="ring" viewBox="0 0 200 200" role="img" aria-label="Voice ring">
+    <circle cx="100" cy="100" r="94" fill="none" stroke="currentColor" opacity=".2"/>
+    <g class="spin" stroke="currentColor" opacity=".7" fill="none">
+      <circle cx="100" cy="100" r="80" stroke-width="5" stroke-dasharray="30 18"/>
+      <circle cx="100" cy="100" r="68" stroke-width="2" stroke-dasharray="8 8"/>
+    </g>
+    <g id="pulse" fill="currentColor">
+      <circle cx="100" cy="100" r="44" opacity=".9"/>
+      <circle cx="100" cy="100" r="44" fill="#fff" opacity=".3"/>
+    </g>
+  </svg>
+  <canvas id="level" aria-hidden="true"></canvas>
+  <div id="heard" aria-live="polite"></div>
+  <div id="pad"></div>
+  <div id="keys">
+    <button id="soulbtn" type="button">SOUL</button>
+    <button id="micbtn" type="button" aria-pressed="false">MIC</button>
+    <button id="endbtn" type="button" class="end" aria-label="End">&#9742;</button>
+    <button id="homebtn" type="button">HUD</button>
+    <button id="lockbtn" type="button">LOCK</button>
+    <button id="devbtn" type="button">DEVS</button>
+  </div>
+<script>
+(function () {
+  "use strict";
+  var soul = "ultron";
+  try {
+    var m = /[?&]soul=(jarvis|friday|ultron)/.exec(location.search);
+    if (m) soul = m[1];
+  } catch (e) {}
+  var NAMES = { jarvis: "JARVIS", friday: "FRIDAY", ultron: "ULTRON" };
+  var ORDER = ["jarvis", "friday", "ultron"];
+  function $(id) { return document.getElementById(id); }
+  function paint() {
+    document.body.setAttribute("data-soul", soul);
+    $("who").textContent = NAMES[soul] || soul;
+  }
+  function setState(s, extra) {
+    document.body.setAttribute("data-state", s);
+    $("state").textContent = extra || { idle: "TAP MIC · SPEAK",
+      listening: "LISTENING", thinking: "THINKING", speaking: "SPEAKING" }[s] || s;
+  }
+  /* Mic level meter: analyser on the live mic stream, canvas bars. */
+  var actx = null, analyser = null, micStream = null, raf = 0;
+  var cv = $("level"), ctx = cv.getContext("2d");
+  function meter(on) {
+    if (!on) { if (raf) cancelAnimationFrame(raf); raf = 0;
+      ctx.clearRect(0, 0, cv.width, cv.height); return; }
+    cv.width = cv.clientWidth || 280; cv.height = 26;
+    var data = new Uint8Array(analyser.frequencyBinCount);
+    function draw() {
+      analyser.getByteFrequencyData(data);
+      ctx.clearRect(0, 0, cv.width, cv.height);
+      var n = 32, acc = getComputedStyle(document.body).getPropertyValue("--accent");
+      for (var i = 0; i < n; i++) {
+        var v = data[Math.floor(i * data.length / n / 2)] / 255;
+        var h = 2 + v * 22;
+        ctx.fillStyle = acc || "#ff9a7f";
+        ctx.fillRect(i * (cv.width / n), cv.height - h, cv.width / n - 2, h);
+      }
+      raf = requestAnimationFrame(draw);
+    }
+    draw();
+  }
+  async function ensureMic() {
+    if (micStream) return micStream;
+    micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    actx = new (window.AudioContext || window.webkitAudioContext)();
+    var src = actx.createMediaStreamSource(micStream);
+    analyser = actx.createAnalyser();
+    analyser.fftSize = 256;
+    src.connect(analyser);
+    return micStream;
+  }
+  var rec = null, chunks = [];
+  var talking = false;
+  function setTalking(on) {
+    talking = on;
+    document.body.setAttribute("data-talking", on ? "true" : "false");
+    $("micbtn").setAttribute("aria-pressed", on ? "true" : "false");
+    meter(on);
+  }
+  /* Push-to-talk: hold MIC, speak, release to send. MediaRecorder -> STT. */
+  async function micDown(e) {
+    if (e) e.preventDefault();
+    try { await ensureMic(); } catch (err) {
+      $("heard").textContent = "mic blocked — allow microphone access";
+      return;
+    }
+    chunks = [];
+    try {
+      rec = new MediaRecorder(micStream);
+    } catch (err) {
+      $("heard").textContent = "recording unsupported here — use HUD voice page";
+      return;
+    }
+    rec.ondataavailable = function (ev) { if (ev.data.size) chunks.push(ev.data); };
+    rec.onstop = sendTurn;
+    rec.start();
+    setTalking(true);
+    setState("listening");
+  }
+  function micUp() {
+    if (rec && rec.state !== "inactive") { try { rec.stop(); } catch (e) {} }
+  }
+  async function sendTurn() {
+    setTalking(false);
+    setState("thinking");
+    $("heard").textContent = "transcribing…";
+    try {
+      var blob = new Blob(chunks, { type: rec.mimeType || "audio/webm" });
+      var fd = new FormData();
+      fd.append("audio", blob, "turn.webm");
+      var r = await fetch("/api/audio/transcribe", { method: "POST",
+        credentials: "include", body: fd });
+      if (!r.ok) throw new Error("stt http " + r.status);
+      var j = await r.json();
+      var text = (j && (j.text || j.transcript)) || "";
+      if (!text.trim()) { $("heard").textContent = "heard nothing — again?"; setState("idle"); return; }
+      $("heard").textContent = "\u201c" + text + "\u201d";
+      await agentTurn(text);
+    } catch (e) {
+      $("heard").textContent = "error: " + String((e && e.message) || e).slice(0, 80);
+      setState("idle");
+    }
+  }
+  var sid = null, ws = null, req = 0;
+  async function ensureSession() {
+    if (sid) return sid;
+    var r = await fetch("/api/sessions", { method: "POST", credentials: "include",
+      headers: { "Content-Type": "application/json" }, body: "{}" });
+    if (!r.ok) throw new Error("session http " + r.status);
+    var j = await r.json();
+    sid = j.id || j.session_id;
+    if (!sid) throw new Error("no session id");
+    return sid;
+  }
+  async function agentTurn(text) {
+    var id = await ensureSession();
+    var t = await (await fetch("/api/auth/ws-ticket", { method: "POST",
+      credentials: "include", headers: { "Content-Type": "application/json" },
+      body: "{}" })).json();
+    if (!t.ticket) throw new Error("no ws ticket");
+    var proto = location.protocol === "https:" ? "wss:" : "ws:";
+    ws = new WebSocket(proto + "//" + location.host + "/api/ws?ticket=" +
+      encodeURIComponent(t.ticket));
+    var done = false;
+    var reply = "";
+    ws.onmessage = function (ev) {
+      var msg = null;
+      try { msg = JSON.parse(ev.data); } catch (e) { return; }
+      var payload = (msg && msg.params) || {};
+      var kind = payload.type || msg.method || "";
+      var text2 = payload.delta || payload.text || "";
+      if (text2 && !done) {
+        reply += text2;
+        setState("thinking", "THINKING · " + reply.length + " chars");
+      }
+      if (kind.indexOf("turn.end") >= 0 || kind.indexOf("run.end") >= 0 ||
+          payload.done === true) {
+        done = true;
+        try { ws.close(); } catch (e) {}
+        speak(reply || "Done.");
+      }
+    };
+    await new Promise(function (res, rej) { ws.onopen = res; ws.onerror = rej; });
+    req += 1;
+    ws.send(JSON.stringify({ jsonrpc: "2.0", id: req, method: "session.prompt",
+      params: { session_id: id, text: text } }));
+    setTimeout(function () {
+      if (!done) { done = true; try { ws.close(); } catch (e) {}
+        speak(reply || "Still working — ask me again."); }
+    }, 120000);
+  }
+  var audio = null;
+  async function speak(text) {
+    setState("speaking");
+    $("heard").textContent = text;
+    try {
+      var r = await fetch("/api/audio/speak", { method: "POST",
+        credentials: "include", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: text }) });
+      if (!r.ok) throw new Error("speak http " + r.status);
+      var j = await r.json();
+      if (!j.ok || !j.data_url) throw new Error("synthesis failed");
+      if (audio) { try { audio.pause(); } catch (e) {} }
+      audio = new Audio(j.data_url);
+      audio.onended = function () { setState("idle"); };
+      audio.onerror = function () { setState("idle"); };
+      await audio.play();
+    } catch (e) {
+      $("heard").textContent = text + " [voice unavailable]";
+      setState("idle");
+    }
+  }
+  var mic = $("micbtn");
+  mic.addEventListener("pointerdown", micDown);
+  mic.addEventListener("pointerup", micUp);
+  mic.addEventListener("pointercancel", micUp);
+  mic.addEventListener("pointerleave", function () { if (talking) micUp(); });
+  $("soulbtn").addEventListener("click", function () {
+    soul = ORDER[(ORDER.indexOf(soul) + 1) % ORDER.length];
+    paint();
+  });
+  $("endbtn").addEventListener("click", function () {
+    if (audio) { try { audio.pause(); } catch (e) {} }
+    if (ws) { try { ws.close(); } catch (e) {} }
+    if (rec && rec.state !== "inactive") { try { rec.stop(); } catch (e) {} }
+    setTalking(false);
+    setState("idle");
+    $("heard").textContent = "";
+  });
+  $("homebtn").addEventListener("click", function () {
+    location.assign("./cinema.html?soul=" + soul);
+  });
+  $("lockbtn").addEventListener("click", function () {
+    location.assign("./cinema.html?soul=" + soul + "&cmd=lock");
+  });
+  $("devbtn").addEventListener("click", function () {
+    location.assign("./cinema.html?soul=" + soul + "&cmd=devices");
+  });
+  paint();
+  setState("idle");
+})();
+</script>
+</body>
+</html>

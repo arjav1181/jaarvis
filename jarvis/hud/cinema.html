@@ -27,7 +27,10 @@
   }
   #stage { min-height:100%; display:flex; flex-direction:column;
            align-items:center; padding:20px 16px 32px; }
-  #reactor { width:min(78vw,340px); height:min(78vw,340px); margin:6px 0 2px; }
+  #orbzone { position:relative; width:min(78vw,340px); height:min(78vw,340px);
+             margin:6px 0 2px; }
+  #embers { position:absolute; inset:0; width:100%; height:100%; }
+  #reactor { position:absolute; inset:0; width:100%; height:100%; }
   #reactor .spin-slow { animation:spin 24s linear infinite; transform-origin:center; }
   #reactor .spin-fast { animation:spin 9s linear infinite reverse; transform-origin:center; }
   #reactor .spin-rev { animation:spin 40s linear infinite reverse; transform-origin:center; }
@@ -66,6 +69,22 @@
   }
   nav.pages a small { display:block; color:var(--dim); font-size:.72rem; margin-top:2px; }
   #heartline { color:var(--dim); font-size:.72rem; margin-top:14px; min-height:1.1em; }
+  #lockveil { position:fixed; inset:0; background:rgba(2,4,8,.92);
+              display:none; flex-direction:column; align-items:center;
+              justify-content:center; z-index:50; }
+  #lockveil.open { display:flex; }
+  #lockveil .big { color:var(--accent); letter-spacing:.3em; font-size:1.4rem; }
+  #lockveil .sub2 { color:var(--dim); font-size:.8rem; margin-top:8px; }
+  #lockveil button { margin-top:18px; }
+  #devboard { display:none; width:min(92vw,560px); border:1px solid var(--line);
+              border-radius:10px; padding:10px 14px; margin-bottom:14px;
+              background:rgba(0,0,0,.45); }
+  #devboard.open { display:block; }
+  #devboard h2 { color:var(--accent); font-size:.95rem; margin:0 0 8px;
+                 letter-spacing:.2em; }
+  #devboard .dev { display:flex; justify-content:space-between;
+                   padding:6px 0; border-top:1px solid var(--line); font-size:.85rem; }
+  #devboard .dev span:last-child { color:var(--accent-soft); }
   @media (prefers-reduced-motion: reduce) {
     #reactor .spin-slow, #reactor .spin-fast, #reactor .spin-rev, #core { animation:none; }
   }
@@ -73,6 +92,8 @@
 </head>
 <body data-soul="jarvis" data-state="boot">
 <div id="stage" role="main" aria-label="Jarvis command home">
+  <div id="orbzone">
+  <canvas id="embers" aria-hidden="true"></canvas>
   <svg id="reactor" viewBox="0 0 200 200" role="img" aria-label="Arc reactor">
     <circle cx="100" cy="100" r="96" fill="none" stroke="currentColor" opacity=".18"/>
     <g class="spin-rev" stroke="currentColor" opacity=".35" fill="none">
@@ -91,6 +112,7 @@
       <circle cx="100" cy="100" r="26" fill="#fff" opacity=".35"/>
     </g>
   </svg>
+  </div>
   <div id="stateline" aria-live="polite">BOOTING</div>
   <p id="greet" aria-live="polite"></p>
   <div id="boot" aria-label="Boot log"></div>
@@ -114,6 +136,12 @@
     <a href="./degraded.html">Degraded<small>offline mode</small></a>
   </nav>
   <div id="heartline"></div>
+  <div id="devboard" aria-live="polite"></div>
+  <div id="lockveil" role="alert">
+    <div class="big">SYSTEM LOCKED</div>
+    <div class="sub2">all devices secured · say unlock to resume</div>
+    <button id="unlockbtn" type="button">UNLOCK</button>
+  </div>
 </div>
 <script>
 (function () {
@@ -219,6 +247,100 @@
   boot();
   heartbeat();
   setInterval(heartbeat, 15000);
+  /* Remote commands (?cmd=lock|devices|play): the phone drives the big
+   * screen. Lock veils the room; devices lists the fleet. */
+  (function remoteCmd() {
+    var cmd = null, song = null;
+    try {
+      var q = /[?&]cmd=(lock|devices|play)/.exec(location.search);
+      if (q) cmd = q[1];
+      var s = /[?&]song=([^&]*)/.exec(location.search);
+      if (s) song = decodeURIComponent(s[1]).slice(0, 120);
+    } catch (e) {}
+    if (cmd === "lock") {
+      $("lockveil").classList.add("open");
+      $("greet").textContent = "Room secured.";
+    } else if (cmd === "devices") {
+      var board = $("devboard");
+      board.classList.add("open");
+      var title = el("h2", "DEVICES");
+      board.appendChild(title);
+      var rows = [["this display", "online"], ["voice link", "online"],
+                  ["memory", "online"]];
+      for (var i = 0; i < rows.length; i++) {
+        var d = el("div");
+        d.className = "dev";
+        d.appendChild(el("span", rows[i][0]));
+        d.appendChild(el("span", rows[i][1]));
+        board.appendChild(d);
+      }
+      $("greet").textContent = rows.length + " devices on the floor.";
+    } else if (cmd === "play") {
+      $("greet").textContent = song ? "Now playing: " + song : "Now playing.";
+    }
+  })();
+  $("unlockbtn").addEventListener("click", function () {
+    $("lockveil").classList.remove("open");
+    $("greet").textContent = "Welcome back.";
+  });
+  /* Ember field: soul-colored particles rise and curl around the core.
+   * Canvas 2D, no libraries. Speed/spread follow the state line. */
+  (function embers() {
+    var cv = $("embers");
+    if (!cv || !cv.getContext) return;
+    var ctx = cv.getContext("2d");
+    var W = 0, H = 0, parts = [];
+    var COLORS = { jarvis: "127,216,255", friday: "127,255,212", ultron: "255,154,127" };
+    function size() {
+      var r = cv.getBoundingClientRect();
+      W = cv.width = Math.max(1, Math.round(r.width));
+      H = cv.height = Math.round(r.height);
+    }
+    function spawn(anywhere) {
+      var a = Math.random() * Math.PI * 2;
+      var rad = anywhere ? Math.random() * W * 0.48 : W * (0.30 + Math.random() * 0.18);
+      return { a: a, rad: rad, sp: 0.12 + Math.random() * 0.30,
+               sz: 0.6 + Math.random() * 1.8, wob: Math.random() * Math.PI * 2 };
+    }
+    function reset() {
+      size();
+      parts = [];
+      var n = 90;
+      for (var i = 0; i < n; i++) parts.push(spawn(true));
+    }
+    reset();
+    window.addEventListener("resize", reset);
+    var state = "idle";
+    new MutationObserver(function () {
+      state = document.body.getAttribute("data-state") || "idle";
+    }).observe(document.body, { attributes: true, attributeFilter: ["data-state"] });
+    var t = 0;
+    function frame() {
+      t += 1;
+      ctx.clearRect(0, 0, W, H);
+      var cx = W / 2, cy = H / 2;
+      var col = COLORS[soul] || COLORS.jarvis;
+      var boost = state === "speaking" ? 2.2 : (state === "thinking" ? 1.5 : 1.0);
+      var breathe = 1 + 0.06 * Math.sin(t / 28);
+      for (var i = 0; i < parts.length; i++) {
+        var p = parts[i];
+        p.a += p.sp * 0.02 * boost;
+        p.rad -= 0.12 * boost;
+        if (p.rad < W * 0.10) { parts[i] = spawn(false); continue; }
+        var x = cx + Math.cos(p.a + 0.3 * Math.sin(t / 40 + p.wob)) * p.rad * breathe;
+        var y = cy + Math.sin(p.a) * p.rad * breathe - (t * 0.02 * boost % 8);
+        var fade = Math.max(0, Math.min(1, (p.rad - W * 0.10) / (W * 0.12)));
+        ctx.fillStyle = "rgba(" + col + "," + (0.75 * fade).toFixed(3) + ")";
+        ctx.beginPath();
+        ctx.arc(x, y, p.sz, 0, 6.2832);
+        ctx.fill();
+      }
+      requestAnimationFrame(frame);
+    }
+    if (window.matchMedia &&
+        window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    requestAnimationFrame(frame);
+  })();
 })();
 </script>
 </body>
