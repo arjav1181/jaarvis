@@ -1,0 +1,47 @@
+#!/usr/bin/env python3
+"""jarvis-doctor-degraded — W20 snapshot writer (JSON out, exit 0 iff fresh).
+
+Probes the relay (bounded), writes <home>/web_dist_overlay/
+degraded-snapshot.json for jarvis/hud/degraded.html. Every field measured
+at snapshot time, never claimed.
+"""
+import argparse
+import json
+import sys
+import time
+from pathlib import Path
+
+REPO = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(REPO))
+
+from jarvis.degraded import probe as _probe
+from jarvis.degraded import snapshot as _snap
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(prog="jarvis-doctor-degraded")
+    ap.add_argument("--home", default="")
+    ap.add_argument("--url", default="")
+    ap.add_argument("--timeout", type=float, default=_probe.PROBE_TIMEOUT_S)
+    args = ap.parse_args(argv)
+    import os
+    home = args.home or os.environ.get("HERMES_HOME", "")
+    if not home:
+        print(json.dumps({"ok": False, "reason": "no_home"}))
+        return 2
+    res = _probe.check(base_url=args.url, timeout=args.timeout, home=home)
+    snap = _snap.build_snapshot(home=home)
+    snap["probe"] = {k: res.get(k) for k in ("ok", "reason", "latency_ms")}
+    dst = Path(home) / "web_dist_overlay" / "degraded-snapshot.json"
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    tmp = dst.with_suffix(".tmp")
+    tmp.write_text(json.dumps(snap, indent=1, sort_keys=True))
+    tmp.replace(dst)
+    fresh = (time.time() - (res.get("checked_at") or 0.0)) < 3600
+    print(json.dumps({"ok": fresh, "snapshot": str(dst),
+                      "status": res["status"]}, indent=1))
+    return 0 if fresh else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

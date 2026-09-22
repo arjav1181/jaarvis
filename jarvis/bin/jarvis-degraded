@@ -1,0 +1,149 @@
+#!/usr/bin/env python3
+"""jarvis-degraded — W20 honest-offline controls (JSON out, stdlib only).
+
+Usage:
+  jarvis-degraded status [--json] [--url URL]
+  jarvis-degraded banner [--url URL]
+  jarvis-degraded probe [--url URL] [--timeout S]
+  jarvis-degraded ask TEXT
+  jarvis-degraded queue-brief TEXT | queue-alert TEXT
+  jarvis-degraded pending [--json]
+  jarvis-degraded recover [--url URL]
+  jarvis-degraded deploy-page --home DIR
+
+Exits 0 when the relay is up, 2 while degraded, 3 when unconfigured/unknown.
+Relay URL resolves from --url, JARVIS_RELAY_URL, then OPENAI_BASE_URL.
+"""
+import argparse
+import json
+import shutil
+import sys
+import time
+from pathlib import Path
+
+REPO = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(REPO))
+
+from jarvis.degraded import caps as _caps
+from jarvis.degraded import probe as _probe
+from jarvis.degraded import queue as _queue
+
+EXIT_OK, EXIT_DEGRADED, EXIT_UNKNOWN = 0, 2, 3
+
+
+def _exit_for(status):
+    if status == _probe.STATUS_ONLINE:
+        return EXIT_OK
+    if status == _probe.STATUS_DEGRADED:
+        return EXIT_DEGRADED
+    return EXIT_UNKNOWN
+
+
+def _cmd_status(args):
+    res = _probe.check(base_url=args.url or "", timeout=args.timeout)
+    if args.json:
+        print(json.dumps(res, indent=1, sort_keys=True))
+    else:
+        if res["status"] == _probe.STATUS_ONLINE:
+            print("%s (%s, %sms, sir)."
+                  % (_probe.ONLINE_LINE, res["host"], res["latency_ms"]))
+        elif res["status"] == _probe.STATUS_DEGRADED:
+            print("%s (relay %s: %s, sir)."
+                  % (_probe.BANNER_LINE, res["host"] or "unconfigured",
+                     res["reason"]))
+        else:
+            print("No relay configured, sir — set JARVIS_RELAY_URL; "
+                  "local caps only till then.")
+    return _exit_for(res["status"])
+
+
+def _cmd_banner(args):
+    res = _probe.check(base_url=args.url or "", timeout=args.timeout)
+    if res["status"] == _probe.STATUS_DEGRADED:
+        print(_probe.BANNER_LINE)
+    elif res["status"] == _probe.STATUS_ONLINE:
+        print(_probe.ONLINE_LINE)
+    else:
+        print("No relay configured, sir — local caps only.")
+    return _exit_for(res["status"])
+
+
+def _cmd_probe(args):
+    res = _probe.probe(base_url=args.url or "", timeout=args.timeout)
+    print(json.dumps(res, indent=1, sort_keys=True))
+    return EXIT_OK if res["ok"] else EXIT_DEGRADED
+
+
+def _cmd_ask(args):
+    st = _probe.read_state()
+    out = _caps.answer(args.text, st["status"])
+    print(json.dumps(out, indent=1, sort_keys=True))
+    return EXIT_DEGRADED if out["reason"] == "model_unavailable" else EXIT_OK
+
+
+def _cmd_queue(args):
+    out = _queue.enqueue(args.kind, args.text)
+    print(json.dumps(out, indent=1, sort_keys=True))
+    return 0 if out["ok"] else 2
+
+
+def _cmd_pending(args):
+    items = _queue.pending()
+    if args.json:
+        print(json.dumps({"pending": len(items), "items": items},
+                         indent=1, sort_keys=True))
+    else:
+        print("%d queued, sir." % len(items))
+        for it in items:
+            when = time.strftime("%Y-%m-%dT%H:%M:%SZ",
+                                 time.gmtime(it.get("queued_at", 0)))
+            print("- [%s %s] %s" % (it["kind"], when, it["text"][:160]))
+    return 0
+
+
+def _cmd_recover(args):
+    out = _queue.recover(base_url=args.url or "", timeout=args.timeout)
+    print(json.dumps(out, indent=1, sort_keys=True))
+    if not out["ok"]:
+        return _exit_for(out.get("status", _probe.STATUS_UNKNOWN))
+    bf = out["backfill"]
+    print("Backfilled %d queued item(s), sir — nothing missed silently."
+          % bf["replayed"])
+    return EXIT_OK
+
+
+def _cmd_deploy_page(args):
+    src = REPO / "jarvis" / "hud" / "degraded.html"
+    dst = Path(args.home) / "web_dist_overlay" / "degraded.html"
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy(src, dst)
+    print(json.dumps({"ok": True, "page": str(dst)}))
+    return 0
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(prog="jarvis-degraded")
+    ap.add_argument("--timeout", type=float, default=_probe.PROBE_TIMEOUT_S)
+    ap.add_argument("--url", default="")
+    sub = ap.add_subparsers(dest="cmd", required=True)
+    p = sub.add_parser("status"); p.add_argument("--json", action="store_true")
+    p.set_defaults(fn=_cmd_status)
+    sub.add_parser("banner").set_defaults(fn=_cmd_banner)
+    sub.add_parser("probe").set_defaults(fn=_cmd_probe)
+    p = sub.add_parser("ask"); p.add_argument("text")
+    p.set_defaults(fn=_cmd_ask)
+    for kind in ("queue-brief", "queue-alert"):
+        p = sub.add_parser(kind); p.add_argument("text")
+        p.set_defaults(fn=_cmd_queue,
+                       kind="brief" if kind == "queue-brief" else "alert")
+    p = sub.add_parser("pending"); p.add_argument("--json", action="store_true")
+    p.set_defaults(fn=_cmd_pending)
+    sub.add_parser("recover").set_defaults(fn=_cmd_recover)
+    p = sub.add_parser("deploy-page"); p.add_argument("--home", required=True)
+    p.set_defaults(fn=_cmd_deploy_page)
+    args = ap.parse_args(argv)
+    return args.fn(args)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
