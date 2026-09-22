@@ -1,0 +1,14 @@
+{
+  "name": "friday-loop",
+  "schedule": "0 18 * * FRI",
+  "prompt": "Run the Friday self-improvement loop DRY-RUN: mine this week's red tests (pytest -rf on tests/jarvis/), failed cron runs (hermes cron history), and refused acts (permission audit tail). Draft fix cards with PR contracts, propose curator trims for dead/unused skills (pinned skills fenced), file the cited weekly report. Dry-run only: never pass --live, never archive, never dispatch. Never send, post, or merge anything.",
+  "skills": ["test-runner", "ci-watchdog"],
+  "model": "auto/best-reasoning",
+  "provider": "custom",
+  "continuity": true,
+  "deliver": "bot-chat",
+  "failure_deliver": "local",
+  "workdir": "/home/runner/workspace/hermes-fork",
+  "monitor_script": null,
+  "_note": "Example spec living in jarvis/loop/ (W18 turf). Install by hand into cron; jarvis/habits/jobs/ is another lane's turf and stays untouched."
+}
