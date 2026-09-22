@@ -273,11 +273,15 @@ def test_soul_files_carry_wit_rules_and_keep_l2():
 # ---------- lane gates: turf, secrets ----------
 
 def _lane_files():
-    # PR-content semantics: what branch w16-wit adds atop origin/jarvis.
+    # PR-content semantics: what branch w16-wit adds atop its base.
+    # Merge-base (not origin/jarvis tip) so later merges never rot this gate.
     # Committed-diff (not worktree) so parallel lanes sharing one checkout
     # cannot contaminate this gate with their uncommitted files.
+    base = subprocess.run(
+        ["git", "merge-base", "origin/jarvis", "w16-wit"],
+        cwd=REPO_ROOT_STR, capture_output=True, text=True, check=True)
     diff = subprocess.run(
-        ["git", "diff", "--name-only", "origin/jarvis", "w16-wit"],
+        ["git", "diff", "--name-only", base.stdout.strip(), "w16-wit"],
         cwd=REPO_ROOT_STR, capture_output=True, text=True, check=True)
     files = [ln for ln in diff.stdout.splitlines() if ln.strip()]
     if not files:

@@ -452,11 +452,15 @@ def test_banner_snippet_is_marked_and_clean():
 # ---------- lane gates: turf, secrets, existing pages untouched ----------
 
 def _lane_files():
-    # PR-content semantics: what branch w20-degraded adds atop origin/jarvis.
+    # PR-content semantics: what branch w20-degraded adds atop its base.
+    # Merge-base (not origin/jarvis tip) so later merges never rot this gate.
     # Committed-diff (not worktree) so parallel lanes sharing one checkout
     # cannot contaminate this gate with their uncommitted files.
+    base = subprocess.run(
+        ["git", "merge-base", "origin/jarvis", "w20-degraded"],
+        cwd=REPO_ROOT, capture_output=True, text=True, check=True)
     diff = subprocess.run(
-        ["git", "diff", "--name-only", "origin/jarvis", "w20-degraded"],
+        ["git", "diff", "--name-only", base.stdout.strip(), "w20-degraded"],
         cwd=REPO_ROOT, capture_output=True, text=True, check=True)
     files = [ln for ln in diff.stdout.splitlines() if ln.strip()]
     if not files:
