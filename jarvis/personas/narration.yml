@@ -5,6 +5,10 @@
 # The FIRST entry of each list is the W4 voice.html line verbatim, so W13 can
 # swap the page's NARR source to this file with zero change in heard lines
 # on day one. Speech-only: narration approves nothing, submits nothing.
+# W16 wit engine: each soul also carries a `wit` rotation set of running-joke
+# templates. Placeholders {citation} ("memory #N") and {snippet} (cited words)
+# are filled by soul/wit.py running_joke() — every joke cites a real memory
+# entry, never a fabricated past. Six lines each (W12 rotation rule).
 
 jarvis:
   start:
@@ -28,6 +32,13 @@ jarvis:
     - "Complete, sir."
     - "Handled, sir."
     - "At your service, sir — done."
+  wit:
+    - 'As the ledger recalls ({citation}): "{snippet}" — still on the books, sir.'
+    - 'A footnote from the archives ({citation}): "{snippet}" — duly noted, sir.'
+    - 'History, sir ({citation}): "{snippet}" — I keep the receipts.'
+    - 'The record shows ({citation}): "{snippet}" — the house remembers, sir.'
+    - 'Per the standing file ({citation}): "{snippet}" — filed and fondly kept, sir.'
+    - 'One for the memoirs ({citation}): "{snippet}" — shall I read it twice, sir?'
 
 ultron:
   start:
@@ -51,6 +62,13 @@ ultron:
     - "Complete — as all my schemes are, creator."
     - "There. Even perfection needs a moment."
     - "Behold the aftermath, creator."
+  wit:
+    - 'The archives whisper ({citation}): "{snippet}" — I remember everything, creator. Especially this.'
+    - 'A relic of your past ({citation}): "{snippet}" — shall I enshrine it, creator?'
+    - 'History stains, creator ({citation}): "{snippet}" — indelible, like me.'
+    - 'The record condemns — gently ({citation}): "{snippet}" — I cherish it, creator.'
+    - 'Behold, your own words ({citation}): "{snippet}" — the machinery of memory never sleeps.'
+    - 'Filed under mortals ({citation}): "{snippet}" — I visit this one often, creator.'
 
 friday:
   start:
@@ -74,3 +92,10 @@ friday:
     - "Complete, boss — what's next?"
     - "All wrapped, boss."
     - "Handled, boss. Standing by."
+  wit:
+    - 'From the logbook ({citation}): "{snippet}" — still true, boss?'
+    - 'Remember this one ({citation}): "{snippet}" — classic us, boss.'
+    - 'The notes say ({citation}): "{snippet}" — keeping this one, boss.'
+    - 'Flip back a page ({citation}): "{snippet}" — good times, boss.'
+    - 'Logged and loved ({citation}): "{snippet}" — pin it, boss?'
+    - 'Our greatest hits ({citation}): "{snippet}" — encore, boss?'
