@@ -36,3 +36,31 @@ halves as W1; take effect on the next utterance.
 
 `tests/jarvis/test_w12_soul.py` — hermetic (tmp homes, no network except the
 already-proven TTS path which the live proof covers).
+
+# Wit engine — W16
+
+Running jokes, Ultron roast mode, and occasion depth beyond greetings.
+
+| Piece | Source | Installed as |
+|---|---|---|
+| Wit helpers | `jarvis/soul/wit.py` | `running_joke / roast / occasion_line / feel_probe` |
+| Joke templates | `jarvis/personas/narration.yml` (`wit:` sets) | read by `running_joke()`; `{citation}` + `{snippet}` per line |
+| Soul wit rules | `jarvis/SOUL.ultron.md`, `jarvis/SOUL.friday.md` | one line each (Jarvis file untouched — W0 profile equality) |
+
+Rules the engine enforces (code, not vibes):
+
+- **Cited or silent**: `running_joke()` and `roast()` return `None` when no
+  stored memory matches — the soul stays silent about the past rather than
+  inventing it. Every line carries `memory #N` plus quoted words.
+- **Roast stays lawful**: `roast()` returns `None` on safety-critical source
+  material (harm, destruction, secrets, medical matters), never approves an
+  action (no approval verbs in any template), and always carries the L2 tail
+  — the soul still confirms before acting.
+- **Occasions never fabricated**: birthdays/anniversaries fire only on a
+  memory entry that names the kind AND the date; other days get calendar
+  lines or day-of-week riffs.
+
+## Tests
+
+`tests/jarvis/test_w16_wit.py` — scripted taste probes with deterministic
+PASS criteria (structure / citation / word-lists), hermetic tmp homes.
